@@ -32,10 +32,17 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
     private var autoReconnectEnabled = MutableStateFlow(true)
     private var currentConnectedDevice: BluetoothDevice? = null
 
+    private val currentAnc = MutableStateFlow("Normal")
+    private val currentGain = MutableStateFlow("Medium")
+    private val selectedPreset = MutableStateFlow(0)
+
     val connectionState = isConnected.asStateFlow()
     val reconnectingState = isReconnecting.asStateFlow()
     val logFlow = logs.asStateFlow()
     val autoReconnect = autoReconnectEnabled.asStateFlow()
+    val ancMode = currentAnc.asStateFlow()
+    val gainMode = currentGain.asStateFlow()
+    val presetMode = selectedPreset.asStateFlow()
 
     data class LogEntry(val time: String, val direction: String, val message: String)
 
@@ -63,6 +70,15 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                 outputStream = socket?.outputStream
                 isConnected.value = true
                 addLog("SUCCESS", "Connected to ${device.name}!")
+                
+                scope.launch {
+                    delay(600)
+                    sendHex("ff040000001d1003") // Query ANC
+                    delay(250)
+                    sendHex("ff040000001d1e01") // Query Gain
+                    delay(250)
+                    sendHex("ff040000001d0a02") // Query EQ Preset
+                }
                 
                 startReadLoop(device)
             } catch (e: IOException) {
@@ -232,11 +248,12 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                 if (dataPart.isNotEmpty()) {
                     val ancVal = dataPart[0].toInt() and 0xff
                     val mode = when (ancVal) {
-                        1 -> "Normal / Off"
-                        2 -> "Noise Cancelling (ANC On)"
+                        1 -> "Normal"
+                        2 -> "ANC"
                         4 -> "Transparency"
                         else -> "Unknown"
                     }
+                    currentAnc.value = mode
                     "ANC Status: $mode"
                 } else "ANC Status Response"
             }
@@ -244,11 +261,12 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                 if (dataPart.isNotEmpty()) {
                     val gainVal = dataPart[0].toInt() and 0xff
                     val mode = when (gainVal) {
-                        0 -> "High Gain"
-                        1 -> "Medium Gain"
-                        2 -> "Low Gain"
+                        0 -> "High"
+                        1 -> "Medium"
+                        2 -> "Low"
                         else -> "Unknown"
                     }
+                    currentGain.value = mode
                     "Gain Status: $mode"
                 } else "Gain Status Response"
             }
@@ -270,6 +288,13 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                 } else {
                     "Panel/EQ Details: ${byteArrayToHexString(dataPart)}"
                 }
+            }
+            "0b02" -> {
+                if (dataPart.isNotEmpty()) {
+                    val presetVal = dataPart[0].toInt() and 0xff
+                    selectedPreset.value = presetVal
+                    "Selected EQ Preset: $presetVal"
+                } else "Selected EQ Preset Response"
             }
             "0105" -> {
                 try {
@@ -313,6 +338,90 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
         return data
     }
 
+    fun selectEQPreset(presetId: Int) {
+        val packet = byteArrayOf(
+            0xff.toByte(), 0x04.toByte(),
+            0x00.toByte(), 0x01.toByte(),
+            0x00.toByte(), 0x1d.toByte(),
+            0x0a.toByte(), 0x03.toByte(),
+            presetId.toByte()
+        )
+        scope.launch {
+            if (!isConnected.value || outputStream == null) {
+                addLog("ERROR", "Not connected to any device.")
+                return@launch
+            }
+            try {
+                outputStream?.write(packet)
+                outputStream?.flush()
+                addLog("TX", byteArrayToHexString(packet) + " [Preset Set to $presetId]")
+                selectedPreset.value = presetId
+            } catch (e: IOException) {
+                addLog("ERROR", "Send Preset failed: ${e.message}")
+            }
+        }
+    }
+
+    fun sendCustomEQ(preGain: Float, bands: List<BandConfig>) {
+        if (bands.isEmpty()) return
+        val startBand = 0
+        val endBand = bands.size - 1
+        val payloadSize = 4 + bands.size * 7
+        val payload = ByteArray(payloadSize)
+        
+        payload[0] = startBand.toByte()
+        payload[1] = endBand.toByte()
+        
+        val formattedPreGain = (preGain * 60.0f).toInt().coerceIn(-32768, 32767)
+        payload[2] = ((formattedPreGain shr 8) and 0xff).toByte()
+        payload[3] = (formattedPreGain and 0xff).toByte()
+        
+        for (i in bands.indices) {
+            val band = bands[i]
+            val offset = 4 + i * 7
+            
+            val freqVal = band.freq.coerceIn(0, 65535)
+            payload[offset] = ((freqVal shr 8) and 0xff).toByte()
+            payload[offset + 1] = (freqVal and 0xff).toByte()
+            
+            val qVal = (band.q * 4096.0f).toInt().coerceIn(0, 65535)
+            payload[offset + 2] = ((qVal shr 8) and 0xff).toByte()
+            payload[offset + 3] = (qVal and 0xff).toByte()
+            
+            payload[offset + 4] = band.filterType.toByte()
+            
+            val gainVal = (band.gain * 60.0f).toInt().coerceIn(-32768, 32767)
+            payload[offset + 5] = ((gainVal shr 8) and 0xff).toByte()
+            payload[offset + 6] = (gainVal and 0xff).toByte()
+        }
+        
+        val packet = ByteArray(8 + payloadSize)
+        packet[0] = 0xff.toByte()
+        packet[1] = 0x04.toByte()
+        packet[2] = ((payloadSize shr 8) and 0xff).toByte()
+        packet[3] = (payloadSize and 0xff).toByte()
+        packet[4] = 0x00.toByte()
+        packet[5] = 0x1d.toByte()
+        packet[6] = 0x0a.toByte()
+        packet[7] = 0x07.toByte()
+        System.arraycopy(payload, 0, packet, 8, payloadSize)
+        
+        scope.launch {
+            if (!isConnected.value || outputStream == null) {
+                addLog("ERROR", "Not connected to any device.")
+                return@launch
+            }
+            try {
+                outputStream?.write(packet)
+                outputStream?.flush()
+                addLog("TX", byteArrayToHexString(packet) + " [Custom EQ Applied]")
+                selectedPreset.value = 63 // User EQ
+            } catch (e: IOException) {
+                addLog("ERROR", "Send EQ failed: ${e.message}")
+            }
+        }
+    }
+
     private fun byteArrayToHexString(bytes: ByteArray): String {
         val sb = StringBuilder()
         for (b in bytes) {
@@ -321,3 +430,10 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
         return sb.toString()
     }
 }
+
+data class BandConfig(
+    val freq: Int,
+    val q: Float,
+    val filterType: Int,
+    val gain: Float
+)
