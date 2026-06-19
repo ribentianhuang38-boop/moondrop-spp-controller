@@ -591,7 +591,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         exit = shrinkVertically()
                     ) {
                         Column(modifier = Modifier.padding(top = 16.dp)) {
-                            HorizontalDivider(color = BorderLight)
+                            Divider(color = BorderLight)
                             Spacer(modifier = Modifier.height(12.dp))
                             
                             // Pre-Gain
