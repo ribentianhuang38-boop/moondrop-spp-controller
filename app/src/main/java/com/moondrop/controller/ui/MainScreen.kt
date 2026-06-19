@@ -210,7 +210,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         modifier = Modifier.padding(end = 16.dp)
                     ) {
                         // Tiny fluorescent green status dot next to status text (connected or not)
-                        val statusDotColor = if (isConnected) ActiveAccent else if (isReconnecting) WarningOrange else TextSecondary
+                        val statusDotColor = if (isConnected) ActiveAccent else if (isReconnecting) Color(0xFFFF9500) else TextSecondary
                         val statusText = if (isConnected) "CONNECTED" else if (isReconnecting) "RECONNECTING" else "DISCONNECTED"
                         
                         Box(
@@ -851,7 +851,7 @@ fun EQVisualizer(
                         val p2 = points[i + 1]
                         val controlX = (p1.x + p2.x) / 2
                         val controlY = (p1.y + p2.y) / 2
-                        quadraticTo(p1.x, p1.y, controlX, controlY)
+                        quadraticBezierTo(p1.x, p1.y, controlX, controlY)
                     }
                     lineTo(points.last().x, points.last().y)
                 }
