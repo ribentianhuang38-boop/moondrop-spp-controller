@@ -101,7 +101,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initBluetooth() {
-        // Bluetooth initialized
+        val pairedDevices = bluetoothManager.getPairedDevices()
+        val targetDevice = pairedDevices.firstOrNull { it.name?.contains("MOONDROP", ignoreCase = true) == true }
+            ?: pairedDevices.firstOrNull()
+        targetDevice?.let {
+            bluetoothManager.connect(it)
+        }
     }
 
     override fun onDestroy() {

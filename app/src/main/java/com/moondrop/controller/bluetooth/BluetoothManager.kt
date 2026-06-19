@@ -33,7 +33,7 @@ class BluetoothManager(
     private val scope = CoroutineScope(Dispatchers.IO)
     
     private var autoReconnectEnabled = MutableStateFlow(true)
-    private var currentConnectedDevice: BluetoothDevice? = null
+    private var currentConnectedDevice = MutableStateFlow<BluetoothDevice?>(null)
 
     private val currentAnc = MutableStateFlow("Normal")
     private val currentGain = MutableStateFlow("Medium")
@@ -42,16 +42,30 @@ class BluetoothManager(
     private val currentSystemVolume = MutableStateFlow(0)
     private val maxSystemVolume = MutableStateFlow(15)
 
+    // Battery values (simulated or real if queried)
+    private val currentBatteryCase = MutableStateFlow(100)
+    private val currentBatteryLeft = MutableStateFlow(100)
+    private val currentBatteryRight = MutableStateFlow(100)
+
     val connectionState = isConnected.asStateFlow()
     val reconnectingState = isReconnecting.asStateFlow()
     val logFlow = logs.asStateFlow()
     val autoReconnect = autoReconnectEnabled.asStateFlow()
+    val deviceState = currentConnectedDevice.asStateFlow()
+    
     val ancMode = currentAnc.asStateFlow()
     val gainMode = currentGain.asStateFlow()
     val presetMode = selectedPreset.asStateFlow()
     
     val systemVolume = currentSystemVolume.asStateFlow()
     val maxVolume = maxSystemVolume.asStateFlow()
+
+    val batteryCase = currentBatteryCase.asStateFlow()
+    val batteryLeft = batteryLeftFlow()
+    val batteryRight = batteryRightFlow()
+
+    private fun batteryLeftFlow() = currentBatteryLeft.asStateFlow()
+    private fun batteryRightFlow() = currentBatteryRight.asStateFlow()
 
     data class LogEntry(val time: String, val direction: String, val message: String)
 
@@ -85,9 +99,9 @@ class BluetoothManager(
     }
 
     fun connect(device: BluetoothDevice) {
-        currentConnectedDevice = device
+        currentConnectedDevice.value = device
         isReconnecting.value = false
-        addLog("INFO", "Connecting to ${device.name} (${device.address})...")
+        addLog("INFO", "Connecting to ${device.name ?: "Device"} (${device.address})...")
         scope.launch {
             try {
                 disconnectInternal()
@@ -98,7 +112,7 @@ class BluetoothManager(
                 inputStream = socket?.inputStream
                 outputStream = socket?.outputStream
                 isConnected.value = true
-                addLog("SUCCESS", "Connected to ${device.name}!")
+                addLog("SUCCESS", "Connected to ${device.name ?: "Device"}!")
                 
                 scope.launch {
                     delay(600)
@@ -123,7 +137,7 @@ class BluetoothManager(
     }
 
     fun disconnect() {
-        currentConnectedDevice = null
+        currentConnectedDevice.value = null
         isReconnecting.value = false
         if (isConnected.value) {
             addLog("WARNING", "Disconnected by user.")
@@ -147,7 +161,7 @@ class BluetoothManager(
         
         scope.launch {
             if (!isConnected.value || outputStream == null) {
-                addLog("ERROR", "Not connected to any device.")
+                addLog("TX (Offline)", cleanHex)
                 return@launch
             }
             try {
@@ -159,6 +173,28 @@ class BluetoothManager(
                 addLog("ERROR", "Send failed: ${e.message}")
             }
         }
+    }
+
+    fun setAncMode(mode: String) {
+        currentAnc.value = mode
+        val hex = when (mode) {
+            "Normal" -> "ff040001001d100401"
+            "ANC" -> "ff040001001d100402"
+            "Transparency" -> "ff040001001d100404"
+            else -> return
+        }
+        sendHex(hex)
+    }
+
+    fun setGainMode(mode: String) {
+        currentGain.value = mode
+        val hex = when (mode) {
+            "Low" -> "ff040001001d1e0202"
+            "Medium" -> "ff040001001d1e0201"
+            "High" -> "ff040001001d1e0200"
+            else -> return
+        }
+        sendHex(hex)
     }
 
     private fun startReadLoop(device: BluetoothDevice) {
@@ -188,7 +224,7 @@ class BluetoothManager(
         }
         
         // If we lost connection and auto-reconnect is active, run it
-        if (!isConnected.value && autoReconnectEnabled.value && currentConnectedDevice != null) {
+        if (!isConnected.value && autoReconnectEnabled.value && currentConnectedDevice.value != null) {
             triggerAutoReconnect(device)
         }
     }
@@ -368,6 +404,7 @@ class BluetoothManager(
     }
 
     fun selectEQPreset(presetId: Int) {
+        selectedPreset.value = presetId
         val packet = byteArrayOf(
             0xff.toByte(), 0x04.toByte(),
             0x00.toByte(), 0x01.toByte(),
@@ -377,14 +414,13 @@ class BluetoothManager(
         )
         scope.launch {
             if (!isConnected.value || outputStream == null) {
-                addLog("ERROR", "Not connected to any device.")
+                addLog("TX (Offline)", byteArrayToHexString(packet) + " [Preset Set to $presetId]")
                 return@launch
             }
             try {
                 outputStream?.write(packet)
                 outputStream?.flush()
                 addLog("TX", byteArrayToHexString(packet) + " [Preset Set to $presetId]")
-                selectedPreset.value = presetId
             } catch (e: IOException) {
                 addLog("ERROR", "Send Preset failed: ${e.message}")
             }
@@ -392,6 +428,7 @@ class BluetoothManager(
     }
 
     fun sendCustomEQ(preGain: Float, bands: List<BandConfig>) {
+        selectedPreset.value = 63 // User EQ
         if (bands.isEmpty()) return
         val startBand = 0
         val endBand = bands.size - 1
@@ -437,14 +474,13 @@ class BluetoothManager(
         
         scope.launch {
             if (!isConnected.value || outputStream == null) {
-                addLog("ERROR", "Not connected to any device.")
+                addLog("TX (Offline)", byteArrayToHexString(packet) + " [Custom EQ Applied]")
                 return@launch
             }
             try {
                 outputStream?.write(packet)
                 outputStream?.flush()
                 addLog("TX", byteArrayToHexString(packet) + " [Custom EQ Applied]")
-                selectedPreset.value = 63 // User EQ
             } catch (e: IOException) {
                 addLog("ERROR", "Send EQ failed: ${e.message}")
             }
@@ -459,10 +495,3 @@ class BluetoothManager(
         return sb.toString()
     }
 }
-
-data class BandConfig(
-    val freq: Int,
-    val q: Float,
-    val filterType: Int,
-    val gain: Float
-)
