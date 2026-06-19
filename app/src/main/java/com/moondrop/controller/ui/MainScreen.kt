@@ -47,6 +47,9 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     val activeGain by bluetoothManager.gainMode.collectAsState()
     val activePreset by bluetoothManager.presetMode.collectAsState()
     
+    val systemVolume by bluetoothManager.systemVolume.collectAsState()
+    val maxVolume by bluetoothManager.maxVolume.collectAsState()
+    
     val pairedDevices = remember { bluetoothManager.getPairedDevices() }
     var selectedDevice by remember { mutableStateOf<BluetoothDevice?>(pairedDevices.firstOrNull { it.name?.contains("MOONDROP", ignoreCase = true) == true } ?: pairedDevices.firstOrNull()) }
     var dropdownExpanded by remember { mutableStateOf(false) }
@@ -188,6 +191,43 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     ) {
                         Text("Disconnect", color = TextLight, fontWeight = FontWeight.Bold)
                     }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Volume Control Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = BgCard),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("SYSTEM / HEADSET VOLUME", color = TextLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "Volume: $systemVolume / $maxVolume",
+                        color = TextLight,
+                        fontSize = 13.sp,
+                        modifier = Modifier.width(130.dp)
+                    )
+                    Slider(
+                        value = systemVolume.toFloat(),
+                        onValueChange = { bluetoothManager.setSystemVolume(it.toInt()) },
+                        valueRange = 0f..maxVolume.toFloat(),
+                        steps = if (maxVolume > 1) maxVolume - 1 else 0,
+                        colors = SliderDefaults.colors(
+                            activeTrackColor = AccentIndigo,
+                            inactiveTrackColor = TextMuted,
+                            thumbColor = SuccessGreen
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }

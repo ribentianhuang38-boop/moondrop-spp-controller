@@ -16,7 +16,10 @@ import java.io.OutputStream
 import java.util.UUID
 
 @SuppressLint("MissingPermission")
-class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
+class BluetoothManager(
+    private val bluetoothAdapter: BluetoothAdapter?,
+    private val audioManager: android.media.AudioManager? = null
+) {
 
     private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
     
@@ -35,6 +38,9 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
     private val currentAnc = MutableStateFlow("Normal")
     private val currentGain = MutableStateFlow("Medium")
     private val selectedPreset = MutableStateFlow(0)
+    
+    private val currentSystemVolume = MutableStateFlow(0)
+    private val maxSystemVolume = MutableStateFlow(15)
 
     val connectionState = isConnected.asStateFlow()
     val reconnectingState = isReconnecting.asStateFlow()
@@ -43,8 +49,31 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
     val ancMode = currentAnc.asStateFlow()
     val gainMode = currentGain.asStateFlow()
     val presetMode = selectedPreset.asStateFlow()
+    
+    val systemVolume = currentSystemVolume.asStateFlow()
+    val maxVolume = maxSystemVolume.asStateFlow()
 
     data class LogEntry(val time: String, val direction: String, val message: String)
+
+    fun initVolume(current: Int, max: Int) {
+        currentSystemVolume.value = current
+        maxSystemVolume.value = max
+    }
+
+    fun updateVolume(volume: Int) {
+        currentSystemVolume.value = volume
+    }
+
+    fun setSystemVolume(volume: Int) {
+        audioManager?.let {
+            try {
+                it.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, volume, 0)
+                currentSystemVolume.value = volume
+            } catch (e: Exception) {
+                addLog("ERROR", "Set volume failed: ${e.message}")
+            }
+        }
+    }
 
     fun setAutoReconnect(enabled: Boolean) {
         autoReconnectEnabled.value = enabled
