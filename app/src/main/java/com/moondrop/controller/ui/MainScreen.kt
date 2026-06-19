@@ -27,6 +27,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -85,6 +90,9 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     
     var customHex by remember { mutableStateOf("") }
     var centralMac by remember { mutableStateOf("90f052c47271") }
+    
+    // UI expanding accordions mapping to the official screenshots
+    var showEQPreset by remember { mutableStateOf(false) }
     var showPEQEditor by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(false) }
     
@@ -159,7 +167,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         modifier = Modifier.clickable { dropdownExpanded = true }
                     ) {
                         Text(
-                            text = connectedDevice?.name ?: selectedDevice?.name ?: "ULTRASONIC",
+                            text = connectedDevice?.name ?: selectedDevice?.name ?: "MOONDROP Ultrasonic",
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
                             fontSize = 18.sp
@@ -254,254 +262,174 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // ─── Hero Product Card ────────────────────────────────────
-            Card(
+            // ─── Hero Product Side-by-Side (No border/card container, like official app) ───
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(200.dp),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                // Left Earbud Column
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Image(
-                        painter = painterResource(id = R.drawable.headphone_hero),
-                        contentDescription = "Moondrop Headphone Render",
-                        contentScale = ContentScale.Fit,
+                        painter = painterResource(id = R.drawable.headphone_left),
+                        contentDescription = "Left Earbud",
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(16.dp)
+                            .height(130.dp)
+                            .padding(bottom = 12.dp),
+                        contentScale = ContentScale.Fit
                     )
+                    BatteryIndicator(level = batteryLeft, label = "L")
+                }
+                
+                // Right Earbud Column
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.headphone_right),
+                        contentDescription = "Right Earbud",
+                        modifier = Modifier
+                            .height(130.dp)
+                            .padding(bottom = 12.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                    BatteryIndicator(level = batteryRight, label = "R")
                 }
             }
 
-            // ─── Battery Section ──────────────────────────────────────
-            Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Charging Case Battery
-                Card(
+            // ─── Case Battery Small Pill Row (Optional but extremely useful to keep) ───
+            if (batteryCase > 0) {
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = CardBg),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    horizontalArrangement = Arrangement.Center
                 ) {
                     Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(CardBg)
+                            .border(1.dp, BorderLight, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.headphone_case),
                             contentDescription = "Charging Case",
-                            modifier = Modifier.size(50.dp)
+                            modifier = Modifier.size(24.dp)
                         )
-                        Spacer(modifier = Modifier.width(16.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "充电仓: $batteryCase%",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+            }
+
+            // ─── Playback Quick & Volume Control Card (Matches official volume split concept) ───
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left Side: Circular Speaker Toggle Button
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(Color(0xFF1D1D1F))
+                            .clickable {
+                                // Toggle volume mute or set to 0/mid as a quick action
+                                if (systemVolume > 0) {
+                                    bluetoothManager.setSystemVolume(0)
+                                } else {
+                                    bluetoothManager.setSystemVolume(maxVolume / 2)
+                                }
+                            }
+                    ) {
+                        val speakerColor = Color.White
+                        Canvas(modifier = Modifier.size(16.dp)) {
+                            // Speaker cone shape
+                            drawRect(
+                                color = speakerColor,
+                                topLeft = Offset(0f, 4.dp.toPx()),
+                                size = Size(4.dp.toPx(), 8.dp.toPx())
+                            )
+                            val path = Path().apply {
+                                moveTo(4.dp.toPx(), 4.dp.toPx())
+                                lineTo(9.dp.toPx(), 0f)
+                                lineTo(9.dp.toPx(), 16.dp.toPx())
+                                lineTo(4.dp.toPx(), 12.dp.toPx())
+                                close()
+                            }
+                            drawPath(path, speakerColor)
+                            
+                            // Wave line arc
+                            drawArc(
+                                color = speakerColor,
+                                startAngle = -45f,
+                                sweepAngle = 90f,
+                                useCenter = false,
+                                topLeft = Offset(5.dp.toPx(), 2.dp.toPx()),
+                                size = Size(8.dp.toPx(), 12.dp.toPx()),
+                                style = Stroke(width = 1.5.dp.toPx())
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.width(16.dp))
+                    
+                    // Right Side: Volume Slider
+                    Column(modifier = Modifier.weight(1f)) {
+                        val volPercent = if (maxVolume > 0) (systemVolume * 100) / maxVolume else 0
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = "充电仓",
+                                text = "系统音量",
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary,
-                                fontSize = 15.sp
+                                fontSize = 13.sp
                             )
                             Text(
-                                text = "Moondrop Ultrasonic Case",
-                                color = TextSecondary,
-                                fontSize = 12.sp
+                                text = "$volPercent%",
+                                fontWeight = FontWeight.Bold,
+                                color = BrandRed,
+                                fontSize = 13.sp
                             )
                         }
-                        Text(
-                            text = "$batteryCase%",
-                            fontWeight = FontWeight.Bold,
-                            color = if (batteryCase > 20) SuccessGreen else ErrorRed,
-                            fontSize = 20.sp
+                        Slider(
+                            value = systemVolume.toFloat(),
+                            onValueChange = { bluetoothManager.setSystemVolume(it.toInt()) },
+                            valueRange = 0f..maxVolume.toFloat(),
+                            colors = SliderDefaults.colors(
+                                activeTrackColor = BrandRed,
+                                thumbColor = BrandRed
+                            ),
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
-
-                // Left & Right Buds Battery Side-by-Side
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Left Earbud Card
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(containerColor = CardBg),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "左耳",
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "$batteryLeft%",
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (batteryLeft > 20) SuccessGreen else ErrorRed,
-                                    fontSize = 14.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Image(
-                                painter = painterResource(id = R.drawable.headphone_left),
-                                contentDescription = "Left Bud",
-                                modifier = Modifier.height(80.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Column(
-                                horizontalAlignment = Alignment.Start,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("单击: 播放/暂停", color = TextSecondary, fontSize = 11.sp)
-                                Text("双击: 上一首", color = TextSecondary, fontSize = 11.sp)
-                                Text("长按: 降噪切换", color = TextSecondary, fontSize = 11.sp)
-                            }
-                        }
-                    }
-
-                    // Right Earbud Card
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(containerColor = CardBg),
-                        shape = RoundedCornerShape(16.dp),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "右耳",
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary,
-                                    fontSize = 14.sp
-                                )
-                                Text(
-                                    text = "$batteryRight%",
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (batteryRight > 20) SuccessGreen else ErrorRed,
-                                    fontSize = 14.sp
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Image(
-                                painter = painterResource(id = R.drawable.headphone_right),
-                                contentDescription = "Right Bud",
-                                modifier = Modifier.height(80.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Column(
-                                horizontalAlignment = Alignment.Start,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("单击: 播放/暂停", color = TextSecondary, fontSize = 11.sp)
-                                Text("双击: 下一首", color = TextSecondary, fontSize = 11.sp)
-                                Text("长按: 语音助手", color = TextSecondary, fontSize = 11.sp)
-                            }
-                        }
-                    }
-                }
             }
 
-            // ─── Noise Control Section ────────────────────────────────
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "降噪模式",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    val ancItems = listOf("降噪", "通透", "关闭")
-                    val currentAncIndex = when (activeAnc) {
-                        "ANC" -> 0
-                        "Transparency" -> 1
-                        else -> 2
-                    }
-                    
-                    SegmentedControl(
-                        items = ancItems,
-                        selectedIndex = currentAncIndex,
-                        onItemSelection = { index ->
-                            if (isConnected) {
-                                val mode = when (index) {
-                                    0 -> "ANC"
-                                    1 -> "Transparency"
-                                    else -> "Normal"
-                                }
-                                bluetoothManager.setAncMode(mode)
-                            }
-                        }
-                    )
-                }
-            }
-
-            // ─── Gain Mode Section ────────────────────────────────────
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "增益模式",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    val gainItems = listOf("低增益", "中增益", "高增益")
-                    val currentGainIndex = when (activeGain) {
-                        "Low" -> 0
-                        "Medium" -> 1
-                        else -> 2
-                    }
-                    
-                    SegmentedControl(
-                        items = gainItems,
-                        selectedIndex = currentGainIndex,
-                        onItemSelection = { index ->
-                            if (isConnected) {
-                                val mode = when (index) {
-                                    0 -> "Low"
-                                    1 -> "Medium"
-                                    else -> "High"
-                                }
-                                bluetoothManager.setGainMode(mode)
-                            }
-                        }
-                    )
-                }
-            }
-
-            // ─── Equalizer Section ────────────────────────────────────
+            // ─── Noise Control Section (降噪设置 with circular icons) ───
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(containerColor = CardBg),
@@ -515,76 +443,444 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "均衡器",
+                            text = "降噪设置",
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary,
-                            fontSize = 16.sp
+                            fontSize = 15.sp
                         )
-                        val presetText = when (activePreset) {
-                            0 -> "默认"
-                            1 -> "低音"
-                            2 -> "清晰"
-                            63 -> "自定义"
-                            else -> "预设 $activePreset"
-                        }
-                        Text(
-                            text = "当前预设: $presetText",
-                            color = BrandRed,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 13.sp
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_next_step),
+                            contentDescription = "More",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(14.dp)
                         )
                     }
                     
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    // EQ Curve Visualizer
-                    EQVisualizer(bands = eqBands)
-                    
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    // EQ Preset Chips
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val presets = listOf(
-                            0 to "默认",
-                            1 to "低音",
-                            2 to "清晰",
-                            63 to "自定义"
-                        )
-                        presets.forEach { (id, name) ->
-                            val active = activePreset == id
-                            FilterChip(
-                                selected = active,
-                                onClick = { 
-                                    if (isConnected) {
-                                        bluetoothManager.selectEQPreset(id) 
-                                    }
-                                },
-                                label = { Text(name, fontWeight = FontWeight.Bold) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = BrandRed.copy(alpha = 0.1f),
-                                    selectedLabelColor = BrandRed,
-                                    selectedLeadingIconColor = BrandRed
-                                ),
-                                modifier = Modifier.weight(1f)
-                            )
+                        OfficialCircleButton(
+                            label = "通透",
+                            isSelected = activeAnc == "Transparency",
+                            onClick = {
+                                if (isConnected) {
+                                    bluetoothManager.setAncMode("Transparency")
+                                }
+                            }
+                        ) {
+                            val color = if (activeAnc == "Transparency") Color.White else Color(0xFF8E8E93)
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 2f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 4.5f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                            }
+                        }
+
+                        OfficialCircleButton(
+                            label = "降噪",
+                            isSelected = activeAnc == "ANC",
+                            onClick = {
+                                if (isConnected) {
+                                    bluetoothManager.setAncMode("ANC")
+                                }
+                            }
+                        ) {
+                            val color = if (activeAnc == "ANC") Color.White else Color(0xFF8E8E93)
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 2f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 5f
+                                )
+                            }
+                        }
+
+                        OfficialCircleButton(
+                            label = "关闭",
+                            isSelected = activeAnc == "Normal" || activeAnc == "",
+                            onClick = {
+                                if (isConnected) {
+                                    bluetoothManager.setAncMode("Normal")
+                                }
+                            }
+                        ) {
+                            val color = if (activeAnc == "Normal" || activeAnc == "") Color.White else Color(0xFF8E8E93)
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 2f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x, center.y - 5.dp.toPx()),
+                                    end = Offset(center.x, center.y + 5.dp.toPx()),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                            }
                         }
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Expand Custom PEQ Button
-                    OutlinedButton(
-                        onClick = { showPEQEditor = !showPEQEditor },
+            // ─── Gain Mode Section (功能设置 with circular icons) ───
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextPrimary)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(if (showPEQEditor) "隐藏自定义 EQ 编辑器" else "展开自定义 EQ 编辑器", fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "功能设置",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 15.sp
+                        )
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_next_step),
+                            contentDescription = "More",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
                     }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OfficialCircleButton(
+                            label = "低增益",
+                            isSelected = activeGain == "Low",
+                            onClick = {
+                                if (isConnected) {
+                                    bluetoothManager.setGainMode("Low")
+                                }
+                            }
+                        ) {
+                            val color = if (activeGain == "Low") Color.White else Color(0xFF8E8E93)
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 2f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x - 3.dp.toPx(), center.y - 5.dp.toPx()),
+                                    end = Offset(center.x - 3.dp.toPx(), center.y + 5.dp.toPx()),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x + 3.dp.toPx(), center.y - 5.dp.toPx()),
+                                    end = Offset(center.x + 3.dp.toPx(), center.y + 5.dp.toPx()),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                        }
 
+                        OfficialCircleButton(
+                            label = "中增益",
+                            isSelected = activeGain == "Medium",
+                            onClick = {
+                                if (isConnected) {
+                                    bluetoothManager.setGainMode("Medium")
+                                }
+                            }
+                        ) {
+                            val color = if (activeGain == "Medium") Color.White else Color(0xFF8E8E93)
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 2f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x - 5.dp.toPx(), center.y - 5.dp.toPx()),
+                                    end = Offset(center.x - 5.dp.toPx(), center.y + 5.dp.toPx()),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x, center.y - 5.dp.toPx()),
+                                    end = Offset(center.x, center.y + 5.dp.toPx()),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x + 5.dp.toPx(), center.y - 5.dp.toPx()),
+                                    end = Offset(center.x + 5.dp.toPx(), center.y + 5.dp.toPx()),
+                                    strokeWidth = 2.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                        }
+
+                        OfficialCircleButton(
+                            label = "高增益",
+                            isSelected = activeGain == "High" || activeGain == "",
+                            onClick = {
+                                if (isConnected) {
+                                    bluetoothManager.setGainMode("High")
+                                }
+                            }
+                        ) {
+                            val color = if (activeGain == "High" || activeGain == "") Color.White else Color(0xFF8E8E93)
+                            Canvas(modifier = Modifier.size(24.dp)) {
+                                drawCircle(
+                                    color = color,
+                                    radius = size.minDimension / 2f,
+                                    style = Stroke(width = 2.dp.toPx())
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x - 5.dp.toPx(), center.y - 5.dp.toPx()),
+                                    end = Offset(center.x - 5.dp.toPx(), center.y + 5.dp.toPx()),
+                                    strokeWidth = 3.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x, center.y - 5.dp.toPx()),
+                                    end = Offset(center.x, center.y + 5.dp.toPx()),
+                                    strokeWidth = 3.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                                drawLine(
+                                    color = color,
+                                    start = Offset(center.x + 5.dp.toPx(), center.y - 5.dp.toPx()),
+                                    end = Offset(center.x + 5.dp.toPx(), center.y + 5.dp.toPx()),
+                                    strokeWidth = 3.dp.toPx(),
+                                    cap = StrokeCap.Round
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── Scenario Presets Card (场景预设 collapsible accordion) ───
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showEQPreset = !showEQPreset },
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left Black Circular List Icon
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFF1D1D1F))
+                        ) {
+                            Canvas(modifier = Modifier.size(16.dp)) {
+                                val yStart = 3.dp.toPx()
+                                val gap = 5.dp.toPx()
+                                for (i in 0..2) {
+                                    drawLine(
+                                        color = Color.White,
+                                        start = Offset(0f, yStart + i * gap),
+                                        end = Offset(size.width, yStart + i * gap),
+                                        strokeWidth = 2.dp.toPx(),
+                                        cap = StrokeCap.Round
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Text(
+                            text = "场景预设",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_next_step),
+                            contentDescription = "Expand EQ Presets",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    
+                    AnimatedVisibility(
+                        visible = showEQPreset,
+                        enter = expandVertically(),
+                        exit = shrinkVertically()
+                    ) {
+                        Column(modifier = Modifier.padding(top = 16.dp)) {
+                            Divider(color = BorderLight)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            val presetText = when (activePreset) {
+                                0 -> "默认"
+                                1 -> "低音"
+                                2 -> "清晰"
+                                63 -> "自定义"
+                                else -> "预设 $activePreset"
+                            }
+                            
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "均衡器曲线",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "当前预设: $presetText",
+                                    color = BrandRed,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // EQ Curve Visualizer
+                            EQVisualizer(bands = eqBands)
+                            
+                            Spacer(modifier = Modifier.height(12.dp))
+                            
+                            // EQ Preset Chips
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val presets = listOf(
+                                    0 to "默认",
+                                    1 to "低音",
+                                    2 to "清晰",
+                                    63 to "自定义"
+                                )
+                                presets.forEach { (id, name) ->
+                                    val active = activePreset == id
+                                    FilterChip(
+                                        selected = active,
+                                        onClick = { 
+                                            if (isConnected) {
+                                                bluetoothManager.selectEQPreset(id) 
+                                            }
+                                        },
+                                        label = { Text(name, fontWeight = FontWeight.Bold) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = BrandRed.copy(alpha = 0.1f),
+                                            selectedLabelColor = BrandRed,
+                                            selectedLeadingIconColor = BrandRed
+                                        ),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ─── STI Sound Preference Card (STI个人声音偏好 collapsible accordion) ───
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showPEQEditor = !showPEQEditor },
+                colors = CardDefaults.cardColors(containerColor = CardBg),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Left Black Circular Soundwave Icon
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(Color(0xFF1D1D1F))
+                        ) {
+                            Canvas(modifier = Modifier.size(16.dp)) {
+                                val barWidth = 2.dp.toPx()
+                                val heights = listOf(6.dp.toPx(), 12.dp.toPx(), 9.dp.toPx(), 5.dp.toPx())
+                                val spacing = 3.dp.toPx()
+                                val startX = (size.width - (4 * barWidth + 3 * spacing)) / 2f
+                                for (i in 0..3) {
+                                    val x = startX + i * (barWidth + spacing)
+                                    val h = heights[i]
+                                    drawLine(
+                                        color = Color.White,
+                                        start = Offset(x + barWidth / 2f, (size.height - h) / 2f),
+                                        end = Offset(x + barWidth / 2f, (size.height + h) / 2f),
+                                        strokeWidth = barWidth,
+                                        cap = StrokeCap.Round
+                                    )
+                                }
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.width(16.dp))
+                        
+                        Text(
+                            text = "STI 个人声音偏好 (自定义 10 段 PEQ)",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                        
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_next_step),
+                            contentDescription = "Expand PEQ Editor",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    
                     AnimatedVisibility(
                         visible = showPEQEditor,
                         enter = expandVertically(),
@@ -677,47 +973,6 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 }
             }
 
-            // ─── Volume Section ───────────────────────────────────────
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = CardBg),
-                shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    val volPercent = if (maxVolume > 0) (systemVolume * 100) / maxVolume else 0
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "音量控制",
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = "$volPercent%",
-                            fontWeight = FontWeight.Bold,
-                            color = BrandRed,
-                            fontSize = 15.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Slider(
-                        value = systemVolume.toFloat(),
-                        onValueChange = { bluetoothManager.setSystemVolume(it.toInt()) },
-                        valueRange = 0f..maxVolume.toFloat(),
-                        colors = SliderDefaults.colors(
-                            activeTrackColor = BrandRed,
-                            thumbColor = BrandRed
-                        ),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
             // ─── Collapsible Advanced Section ─────────────────────────
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -727,7 +982,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     onClick = { showAdvanced = !showAdvanced }
                 ) {
                     Text(
-                        text = if (showAdvanced) "隐藏高级选项 ▲" else "展开高级选项 ▼",
+                        text = if (showAdvanced) "隐藏高级调试选项 ▲" else "展开高级调试选项 ▼",
                         color = TextSecondary,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -929,58 +1184,91 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     }
 }
 
-// ─── Custom Segmented Control ─────────────────────────────────
+// ─── Custom Circular Button to match official app UI ──────────
 @Composable
-fun SegmentedControl(
-    items: List<String>,
-    selectedIndex: Int,
-    onItemSelection: (index: Int) -> Unit,
-    modifier: Modifier = Modifier
+fun OfficialCircleButton(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    iconContent: @Composable BoxScope.() -> Unit
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .background(Color(0xFFEFEFF4), RoundedCornerShape(24.dp))
-            .padding(2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(8.dp)
     ) {
-        items.forEachIndexed { index, text ->
-            val isSelected = index == selectedIndex
-            val animBgColor by animateColorAsState(
-                targetValue = if (isSelected) Color.White else Color.Transparent,
-                animationSpec = tween(200),
-                label = "segmentBg"
-            )
-            val animTextColor by animateColorAsState(
-                targetValue = if (isSelected) BrandRed else TextSecondary,
-                animationSpec = tween(200),
-                label = "segmentText"
-            )
-            val shadowModifier = if (isSelected) {
-                Modifier.shadow(elevation = 2.dp, shape = RoundedCornerShape(22.dp))
-            } else {
-                Modifier
-            }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(60.dp)
+                .clip(RoundedCornerShape(50))
+                .background(if (isSelected) Color(0xFF1D1D1F) else Color(0xFFF2F2F7))
+        ) {
+            iconContent()
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = label,
+            color = if (isSelected) TextPrimary else TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
 
+// ─── Battery Indicator Component (Matches official horizontal style) ──
+@Composable
+fun BatteryIndicator(level: Int, label: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(4.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Horizontal Battery Container
             Box(
                 modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(22.dp))
-                    .then(shadowModifier)
-                    .background(animBgColor)
-                    .clickable { onItemSelection(index) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
+                    .width(26.dp)
+                    .height(13.dp)
+                    .border(1.5.dp, Color(0xFF8E8E93), RoundedCornerShape(3.dp))
+                    .padding(1.5.dp)
             ) {
-                Text(
-                    text = text,
-                    color = animTextColor,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth((level.coerceIn(0, 100)) / 100f)
+                        .background(
+                            if (level > 20) Color(0xFF34C759) else Color(0xFFFF3B30),
+                            RoundedCornerShape(1.dp)
+                        )
                 )
             }
+            Spacer(modifier = Modifier.width(1.dp))
+            // Battery tip
+            Box(
+                modifier = Modifier
+                    .size(width = 2.dp, height = 4.dp)
+                    .background(Color(0xFF8E8E93), RoundedCornerShape(right = 1.dp))
+            )
+            
+            Spacer(modifier = Modifier.width(6.dp))
+            
+            Text(
+                text = "$level%",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
         }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = TextSecondary
+        )
     }
 }
 
