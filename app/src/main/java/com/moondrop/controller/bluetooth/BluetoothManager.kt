@@ -495,3 +495,10 @@ class BluetoothManager(
         return sb.toString()
     }
 }
+
+data class BandConfig(
+    val freq: Int,
+    val q: Float,
+    val filterType: Int,
+    val gain: Float
+)

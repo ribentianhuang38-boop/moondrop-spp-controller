@@ -1,9 +1,8 @@
-name: Build Android App
+name: Build & Release APK
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -22,6 +21,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.4'
 
       - name: Generate Gradle Wrapper
         run: gradle wrapper --gradle-version 8.4
@@ -32,8 +33,13 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
+      - name: Rename APK
+        run: |
+          mv app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/MoondropController-debug.apk
+
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: MoondropController-Debug-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: MoondropController-Debug
+          path: app/build/outputs/apk/debug/MoondropController-debug.apk
+          retention-days: 30

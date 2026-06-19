@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -135,16 +136,18 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     ) {
         // Tech grid lines decoration background
         Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
             val step = 80.dp.toPx()
             val lineColor = MechaColors.secondaryDim.copy(alpha = 0.03f)
             
             // Vertical lines
             var x = 0f
-            while (x < size.width) {
+            while (x < w) {
                 drawLine(
                     color = lineColor,
                     start = Offset(x, 0f),
-                    end = Offset(x, size.height),
+                    end = Offset(x, h),
                     strokeWidth = 1.dp.toPx()
                 )
                 x += step
@@ -152,11 +155,11 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
             
             // Horizontal lines
             var y = 0f
-            while (y < size.height) {
+            while (y < h) {
                 drawLine(
                     color = lineColor,
                     start = Offset(0f, y),
-                    end = Offset(size.width, y),
+                    end = Offset(w, y),
                     strokeWidth = 1.dp.toPx()
                 )
                 y += step
@@ -180,7 +183,8 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                                 MechaColors.secondary.copy(alpha = 0.08f),
                                 Color.Transparent
                             )
-                        )
+                        ),
+                        shape = androidx.compose.ui.graphics.RectangleShape
                     )
                     .padding(horizontal = 24.dp, vertical = 16.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
