@@ -39,6 +39,9 @@ class BluetoothManager(
     private val currentGain = MutableStateFlow("Medium")
     private val selectedPreset = MutableStateFlow(0)
     
+    private val isLdacEnabled = MutableStateFlow(false)
+    private val isLc3Enabled = MutableStateFlow(false)
+    
     private val currentSystemVolume = MutableStateFlow(0)
     private val maxSystemVolume = MutableStateFlow(15)
 
@@ -56,6 +59,9 @@ class BluetoothManager(
     val ancMode = currentAnc.asStateFlow()
     val gainMode = currentGain.asStateFlow()
     val presetMode = selectedPreset.asStateFlow()
+    
+    val ldacEnabled = isLdacEnabled.asStateFlow()
+    val lc3Enabled = isLc3Enabled.asStateFlow()
     
     val systemVolume = currentSystemVolume.asStateFlow()
     val maxVolume = maxSystemVolume.asStateFlow()
@@ -409,7 +415,7 @@ class BluetoothManager(
             0xff.toByte(), 0x04.toByte(),
             0x00.toByte(), 0x01.toByte(),
             0x00.toByte(), 0x1d.toByte(),
-            0x0a.toByte(), 0x03.toByte(),
+            0x00.toByte(), 0x0c.toByte(), // Bluetrum select preset command
             presetId.toByte()
         )
         scope.launch {
@@ -424,6 +430,34 @@ class BluetoothManager(
             } catch (e: IOException) {
                 addLog("ERROR", "Send Preset failed: ${e.message}")
             }
+        }
+    }
+
+    fun toggleLdac(centralMac: String) {
+        val cleanMac = centralMac.replace(":", "").replace("-", "")
+        if (isLdacEnabled.value) {
+            // Deactivate LDAC
+            sendHex("ff040001001d2a0200") // Deactivate command
+            isLdacEnabled.value = false
+            addLog("INFO", "Deactivating LDAC...")
+        } else {
+            if (cleanMac.length == 12) {
+                sendHex("ff040006001d2a02$cleanMac")
+                isLdacEnabled.value = true
+                addLog("INFO", "Activating LDAC with MAC $cleanMac...")
+            }
+        }
+    }
+
+    fun toggleLc3() {
+        if (isLc3Enabled.value) {
+            sendHex("ff040001001d200400") // LC3 OFF
+            isLc3Enabled.value = false
+            addLog("INFO", "Disabling LC3 / LE Audio...")
+        } else {
+            sendHex("ff040001001d200401") // LC3 ON
+            isLc3Enabled.value = true
+            addLog("INFO", "Enabling LC3 / LE Audio...")
         }
     }
 
