@@ -18,6 +18,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -301,6 +303,8 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 ) {
                     // Chamfered corner decoration using drawing path
                     Canvas(modifier = Modifier.fillMaxSize()) {
+                        val w = size.width
+                        val h = size.height
                         val path = Path().apply {
                             // Top left corner decoration
                             moveTo(0f, 15f)
@@ -311,12 +315,12 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                             lineTo(20f, 0f)
                             
                             // Bottom right corner decoration
-                            moveTo(size.width, size.height - 15f)
-                            lineTo(size.width - 15f, size.height)
-                            moveTo(size.width, size.height)
-                            lineTo(size.width, size.height - 20f)
-                            moveTo(size.width, size.height)
-                            lineTo(size.width - 20f, size.height)
+                            moveTo(w, h - 15f)
+                            lineTo(w - 15f, h)
+                            moveTo(w, h)
+                            lineTo(w, h - 20f)
+                            moveTo(w, h)
+                            lineTo(w - 20f, h)
                         }
                         drawPath(
                             path = path,
@@ -757,7 +761,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                             Spacer(modifier = Modifier.height(8.dp))
                             
                             // 10 bands list
-                            eqBands.forEachIndexed { index, band ->
+                            eqBands.forEachIndexed { index: Int, band: BandConfig ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
