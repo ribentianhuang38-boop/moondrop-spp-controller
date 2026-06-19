@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -22,24 +23,38 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
     private var socket: BluetoothSocket? = null
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
+    
     private val isConnected = MutableStateFlow(false)
+    private val isReconnecting = MutableStateFlow(false)
     private val logs = MutableStateFlow<List<LogEntry>>(emptyList())
     private val scope = CoroutineScope(Dispatchers.IO)
+    
+    private var autoReconnectEnabled = MutableStateFlow(true)
+    private var currentConnectedDevice: BluetoothDevice? = null
 
     val connectionState = isConnected.asStateFlow()
+    val reconnectingState = isReconnecting.asStateFlow()
     val logFlow = logs.asStateFlow()
+    val autoReconnect = autoReconnectEnabled.asStateFlow()
 
     data class LogEntry(val time: String, val direction: String, val message: String)
+
+    fun setAutoReconnect(enabled: Boolean) {
+        autoReconnectEnabled.value = enabled
+        addLog("INFO", "Auto-reconnect set to: $enabled")
+    }
 
     fun getPairedDevices(): List<BluetoothDevice> {
         return bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
     }
 
     fun connect(device: BluetoothDevice) {
+        currentConnectedDevice = device
+        isReconnecting.value = false
         addLog("INFO", "Connecting to ${device.name} (${device.address})...")
         scope.launch {
             try {
-                disconnect()
+                disconnectInternal()
                 
                 socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
                 socket?.connect()
@@ -49,20 +64,30 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                 isConnected.value = true
                 addLog("SUCCESS", "Connected to ${device.name}!")
                 
-                startReadLoop()
+                startReadLoop(device)
             } catch (e: IOException) {
                 addLog("ERROR", "Connection failed: ${e.message}")
                 isConnected.value = false
                 try { socket?.close() } catch (ex: Exception) {}
+                
+                if (autoReconnectEnabled.value) {
+                    triggerAutoReconnect(device)
+                }
             }
         }
     }
 
     fun disconnect() {
+        currentConnectedDevice = null
+        isReconnecting.value = false
         if (isConnected.value) {
-            addLog("WARNING", "Disconnected.")
+            addLog("WARNING", "Disconnected by user.")
         }
         isConnected.value = false
+        disconnectInternal()
+    }
+
+    private fun disconnectInternal() {
         try { inputStream?.close() } catch (e: Exception) {}
         try { outputStream?.close() } catch (e: Exception) {}
         try { socket?.close() } catch (e: Exception) {}
@@ -91,7 +116,7 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
         }
     }
 
-    private fun startReadLoop() {
+    private fun startReadLoop(device: BluetoothDevice) {
         val buffer = ByteArray(1024)
         val byteBuffer = mutableListOf<Byte>()
         while (isConnected.value) {
@@ -114,6 +139,48 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
                     isConnected.value = false
                 }
                 break
+            }
+        }
+        
+        // If we lost connection and auto-reconnect is active, run it
+        if (!isConnected.value && autoReconnectEnabled.value && currentConnectedDevice != null) {
+            triggerAutoReconnect(device)
+        }
+    }
+
+    private fun triggerAutoReconnect(device: BluetoothDevice) {
+        if (isReconnecting.value) return
+        
+        scope.launch {
+            isReconnecting.value = true
+            addLog("WARNING", "Connection lost! Waiting 5s for device to restart before auto-reconnect...")
+            delay(5000)
+            
+            var attempt = 1
+            val maxAttempts = 15
+            while (attempt <= maxAttempts && !isConnected.value && isReconnecting.value) {
+                addLog("INFO", "Auto-reconnect attempt ($attempt/$maxAttempts)...")
+                try {
+                    disconnectInternal()
+                    socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                    socket?.connect()
+                    
+                    inputStream = socket?.inputStream
+                    outputStream = socket?.outputStream
+                    isConnected.value = true
+                    isReconnecting.value = false
+                    addLog("SUCCESS", "Auto-reconnected successfully!")
+                    
+                    startReadLoop(device)
+                    break
+                } catch (e: Exception) {
+                    attempt++
+                    delay(3000)
+                }
+            }
+            if (!isConnected.value) {
+                isReconnecting.value = false
+                addLog("ERROR", "Auto-reconnect failed after $maxAttempts attempts.")
             }
         }
     }
@@ -192,6 +259,10 @@ class BluetoothManager(private val bluetoothAdapter: BluetoothAdapter?) {
             "2b02" -> {
                 val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
                 "LDAC Activation ACK: $status"
+            }
+            "2104" -> {
+                val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
+                "LC3 / LE Audio Set ACK: $status"
             }
             "0b05" -> {
                 if (dataPart.size > 8) {

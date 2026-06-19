@@ -36,6 +36,8 @@ val WarningYellow = Color(0xFFFBBF24)
 @Composable
 fun MainScreen(bluetoothManager: BluetoothManager) {
     val isConnected by bluetoothManager.connectionState.collectAsState()
+    val isReconnecting by bluetoothManager.reconnectingState.collectAsState()
+    val autoReconnect by bluetoothManager.autoReconnect.collectAsState()
     val logs by bluetoothManager.logFlow.collectAsState()
     
     val pairedDevices = remember { bluetoothManager.getPairedDevices() }
@@ -77,12 +79,20 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     modifier = Modifier
                         .size(8.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(if (isConnected) SuccessGreen else ErrorRed)
+                        .background(
+                            if (isConnected) SuccessGreen 
+                            else if (isReconnecting) WarningYellow 
+                            else ErrorRed
+                        )
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = if (isConnected) "Connected" else "Disconnected",
-                    color = if (isConnected) SuccessGreen else ErrorRed,
+                    text = if (isConnected) "Connected" 
+                           else if (isReconnecting) "Reconnecting..." 
+                           else "Disconnected",
+                    color = if (isConnected) SuccessGreen 
+                            else if (isReconnecting) WarningYellow 
+                            else ErrorRed,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -91,6 +101,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Connection Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = BgCard),
@@ -105,7 +116,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         .fillMaxWidth()
                         .background(BgDark, RoundedCornerShape(6.dp))
                         .border(1.dp, TextMuted, RoundedCornerShape(6.dp))
-                        .clickable { if (!isConnected) dropdownExpanded = true }
+                        .clickable { if (!isConnected && !isReconnecting) dropdownExpanded = true }
                         .padding(12.dp)
                 ) {
                     Text(
@@ -135,7 +146,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = { selectedDevice?.let { bluetoothManager.connect(it) } },
-                        enabled = !isConnected && selectedDevice != null,
+                        enabled = !isConnected && !isReconnecting && selectedDevice != null,
                         colors = ButtonDefaults.buttonColors(containerColor = SuccessGreen),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier.weight(1f)
@@ -145,7 +156,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { bluetoothManager.disconnect() },
-                        enabled = isConnected,
+                        enabled = isConnected || isReconnecting,
                         colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
                         shape = RoundedCornerShape(6.dp),
                         modifier = Modifier.weight(1f)
@@ -158,6 +169,71 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
 
         Spacer(modifier = Modifier.height(12.dp))
 
+        // Codec & Mode Switch Card
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = BgCard),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("CODEC / PROTOCOL SWITCH (模式切换)", color = TextLight, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Button(
+                        onClick = { 
+                            val cleanMac = centralMac.replace(":", "").replace("-", "")
+                            if (cleanMac.length == 12) {
+                                bluetoothManager.sendHex("ff040006001d2a02$cleanMac")
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                    ) {
+                        Text("LDAC Mode", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = { bluetoothManager.sendHex("ff040001001d200401") },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                    ) {
+                        Text("LC3 Enable", fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = { bluetoothManager.sendHex("ff040001001d200400") },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
+                        shape = RoundedCornerShape(4.dp),
+                        modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                    ) {
+                        Text("LC3 Disable", fontSize = 11.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().clickable { bluetoothManager.setAutoReconnect(!autoReconnect) }
+                ) {
+                    Checkbox(
+                        checked = autoReconnect,
+                        onCheckedChange = { bluetoothManager.setAutoReconnect(it) },
+                        colors = CheckboxDefaults.colors(checkedColor = AccentIndigo, uncheckedColor = TextMuted)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Auto-Reconnect after mode switch (切换后自动重连)", color = TextLight, fontSize = 12.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // ANC & Gain Controls Card
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = BgCard),
@@ -241,7 +317,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("LDAC", color = TextLight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("Central MAC (for LDAC)", color = TextLight, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = centralMac,
@@ -255,20 +331,6 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         ),
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Button(
-                        onClick = {
-                            val cleanMac = centralMac.replace(":", "").replace("-", "")
-                            if (cleanMac.length == 12) {
-                                bluetoothManager.sendHex("ff040006001d2a02$cleanMac")
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentIndigo),
-                        shape = RoundedCornerShape(4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text("Enable LDAC", fontSize = 10.sp)
-                    }
                 }
             }
             
