@@ -1250,7 +1250,7 @@ fun BatteryIndicator(level: Int, label: String) {
             Box(
                 modifier = Modifier
                     .size(width = 2.dp, height = 4.dp)
-                    .background(Color(0xFF8E8E93), RoundedCornerShape(right = 1.dp))
+                    .background(Color(0xFF8E8E93), RoundedCornerShape(topEnd = 1.dp, bottomEnd = 1.dp))
             )
             
             Spacer(modifier = Modifier.width(6.dp))
