@@ -43,6 +43,10 @@ import com.moondrop.controller.R
 import com.moondrop.controller.bluetooth.BandConfig
 import com.moondrop.controller.bluetooth.BluetoothManager
 import kotlinx.coroutines.delay
+import android.app.Activity
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.compose.runtime.saveable.rememberSaveable
 
 // ─── Design System Tokens ──────────────────────────────────────
 val BgWhite = Color(0xFFFFFFFF)        // Pure white background
@@ -89,8 +93,8 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     var showAdvanced by remember { mutableStateOf(false) }
     
     // Splash screen states
-    var isSplashScreenActive by remember { mutableStateOf(true) }
-    var splashVisible by remember { mutableStateOf(true) }
+    var isSplashScreenActive by rememberSaveable { mutableStateOf(true) }
+    var splashVisible by rememberSaveable { mutableStateOf(true) }
     
     val splashAlpha by animateFloatAsState(
         targetValue = if (splashVisible) 1f else 0f,
@@ -102,6 +106,19 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         animationSpec = tween(500, easing = FastOutSlowInEasing),
         label = "splashScale"
     )
+
+    val view = LocalView.current
+    val context = view.context
+    if (!view.isInEditMode && context is Activity) {
+        SideEffect {
+            val window = context.window
+            window.statusBarColor = android.graphics.Color.TRANSPARENT
+            window.navigationBarColor = android.graphics.Color.TRANSPARENT
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.isAppearanceLightStatusBars = !splashVisible
+            insetsController.isAppearanceLightNavigationBars = !splashVisible
+        }
+    }
 
     // Connection Pop-up dialog states
     var showConnectionPopup by remember { mutableStateOf(false) }
@@ -962,11 +979,15 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 splashVisible = false
                 delay(500)
                 isSplashScreenActive = false
+                // Trigger permission request after splash finishes!
+                if (!hasPermission) {
+                    bluetoothManager.requestBluetoothPermission()
+                }
             }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(BgWhite.copy(alpha = splashAlpha))
+                    .background(Color.Black)
                     .graphicsLayer {
                         alpha = splashAlpha
                     },
@@ -975,15 +996,13 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.graphicsLayer(
-                        scaleX = splashScale,
-                        scaleY = splashScale
+                        alpha = 1f
                     )
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_logo),
                         contentDescription = "Moondrop Logo",
-                        modifier = Modifier.size(80.dp),
-                        colorFilter = ColorFilter.tint(TextPrimary)
+                        modifier = Modifier.size(100.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -991,7 +1010,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         letterSpacing = 4.sp,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = TextPrimary
+                        color = Color.White
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -999,7 +1018,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         letterSpacing = 2.sp,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary
+                        color = Color.White.copy(alpha = 0.6f)
                     )
                 }
             }
@@ -1032,6 +1051,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
+                        .navigationBarsPadding() // Keep it above system navigation gesture bar/mBack
                         .padding(horizontal = 24.dp)
                         .padding(bottom = 40.dp) // Suspend it above the bottom
                 ) {
@@ -1039,10 +1059,10 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(BgWhite, RoundedCornerShape(24.dp))
-                            .border(1.dp, BorderLight, RoundedCornerShape(24.dp))
+                            .background(Color.Black, RoundedCornerShape(24.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
                             .clickable(enabled = true, onClick = {}) // prevent click propagation
-                            .padding(top = 40.dp) // extra padding for overlapping badge
+                            .padding(top = 48.dp) // extra padding for overlapping badge
                             .padding(bottom = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -1052,7 +1072,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                                 .padding(vertical = 12.dp)
                                 .width(36.dp)
                                 .height(4.dp)
-                                .background(BorderLight, CircleShape)
+                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -1060,13 +1080,13 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         Text(
                             text = "MOONDROP ULTRASONIC",
                             fontWeight = FontWeight.Bold,
-                            color = TextPrimary,
+                            color = Color.White,
                             fontSize = 16.sp,
                             letterSpacing = 1.sp
                         )
                         Text(
                             text = "已连接",
-                            color = TextSecondary,
+                            color = Color.White.copy(alpha = 0.6f),
                             fontSize = 12.sp
                         )
 
@@ -1093,7 +1113,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                                     text = "L  $batteryLeft%",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                    color = Color.White
                                 )
                             }
 
@@ -1112,7 +1132,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                                     text = "R  $batteryRight%",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
+                                    color = Color.White
                                 )
                             }
                         }
@@ -1127,7 +1147,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                             Text(
                                 text = "NOISE CONTROL",
                                 fontWeight = FontWeight.Bold,
-                                color = TextSecondary,
+                                color = Color.White.copy(alpha = 0.6f),
                                 fontSize = 10.sp,
                                 letterSpacing = 1.sp
                             )
@@ -1150,65 +1170,34 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                                         else -> "Normal"
                                     }
                                     bluetoothManager.setAncMode(mode)
-                                }
+                                },
+                                isDark = true
                             )
 
                             Spacer(modifier = Modifier.height(28.dp))
 
                             Button(
                                 onClick = { showConnectionPopup = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
                                 shape = RoundedCornerDefault,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(48.dp)
                             ) {
-                                Text("DONE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("DONE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             }
                         }
                     }
 
-                    // 2. The Overlapping Logo Badge (half out of the top edge)
-                    val infiniteTransition = rememberInfiniteTransition(label = "logo_float")
-                    val floatTranslationY by infiniteTransition.animateFloat(
-                        initialValue = -4f,
-                        targetValue = 4f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1200, easing = EaseInOutSine),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "floatY"
-                    )
-                    val floatRotation by infiniteTransition.animateFloat(
-                        initialValue = -3f,
-                        targetValue = 3f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(1800, easing = EaseInOutSine),
-                            repeatMode = RepeatMode.Reverse
-                        ),
-                        label = "floatRotation"
-                    )
-
-                    Box(
+                    // 2. The Overlapping Logo Badge (half out of the top edge, top-left aligned, static, size 80.dp)
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_logo_transparent),
+                        contentDescription = "Moondrop Logo",
                         modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .offset(y = (-32).dp)
-                            .size(64.dp)
-                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                            .border(2.dp, BgWhite, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_logo_transparent),
-                            contentDescription = "Moondrop Logo",
-                            modifier = Modifier
-                                .size(36.dp)
-                                .graphicsLayer {
-                                    translationY = floatTranslationY.dp.toPx()
-                                    rotationZ = -8f + floatRotation
-                                }
-                        )
-                    }
+                            .align(Alignment.TopStart)
+                            .offset(x = 24.dp, y = (-40).dp)
+                            .size(80.dp)
+                    )
                 }
             }
         }
@@ -1220,12 +1209,18 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
 fun MinimalSegmentedControl(
     items: List<String>,
     selectedIndex: Int,
-    onItemSelection: (index: Int) -> Unit
+    onItemSelection: (index: Int) -> Unit,
+    isDark: Boolean = false
 ) {
+    val borderColor = if (isDark) Color.White.copy(alpha = 0.2f) else BorderLight
+    val unselectedTextColor = if (isDark) Color.White.copy(alpha = 0.6f) else TextSecondary
+    val selectedBgColor = if (isDark) Color.White else TextPrimary
+    val selectedTextColor = if (isDark) Color.Black else Color.White
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .border(1.dp, BorderLight, RoundedCornerDefault)
+            .border(1.dp, borderColor, RoundedCornerDefault)
             .clip(RoundedCornerDefault)
     ) {
         items.forEachIndexed { index, text ->
@@ -1233,12 +1228,12 @@ fun MinimalSegmentedControl(
             
             // Non-linear color animation on click transitions
             val animBgColor by animateColorAsState(
-                targetValue = if (isSelected) TextPrimary else Color.Transparent,
+                targetValue = if (isSelected) selectedBgColor else Color.Transparent,
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
                 label = "segmentBg"
             )
             val animTextColor by animateColorAsState(
-                targetValue = if (isSelected) Color.White else TextSecondary,
+                targetValue = if (isSelected) selectedTextColor else unselectedTextColor,
                 animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
                 label = "segmentText"
             )
@@ -1264,7 +1259,7 @@ fun MinimalSegmentedControl(
                     modifier = Modifier
                         .width(1.dp)
                         .height(38.dp)
-                        .background(BorderLight)
+                        .background(borderColor)
                 )
             }
         }
