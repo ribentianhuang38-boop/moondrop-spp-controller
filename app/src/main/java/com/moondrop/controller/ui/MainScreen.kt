@@ -118,8 +118,8 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
             window.statusBarColor = android.graphics.Color.TRANSPARENT
             window.navigationBarColor = android.graphics.Color.TRANSPARENT
             val insetsController = WindowCompat.getInsetsController(window, view)
-            insetsController.isAppearanceLightStatusBars = !splashVisible
-            insetsController.isAppearanceLightNavigationBars = !splashVisible
+            insetsController.isAppearanceLightStatusBars = true
+            insetsController.isAppearanceLightNavigationBars = true
         }
     }
 
@@ -990,7 +990,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black)
+                    .background(Color.White)
                     .graphicsLayer {
                         alpha = splashAlpha
                     },
@@ -1002,18 +1002,26 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         alpha = 1f
                     )
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_logo),
-                        contentDescription = "Moondrop Logo",
-                        modifier = Modifier.size(100.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    // Black-background white-text logo badge (rounded square)
+                    Box(
+                        modifier = Modifier
+                            .size(120.dp)
+                            .background(Color.Black, RoundedCornerShape(24.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_logo),
+                            contentDescription = "Moondrop Logo",
+                            modifier = Modifier.size(80.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "MOONDROP",
                         letterSpacing = 4.sp,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
@@ -1021,7 +1029,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         letterSpacing = 2.sp,
                         fontSize = 10.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = TextSecondary
                     )
                 }
             }

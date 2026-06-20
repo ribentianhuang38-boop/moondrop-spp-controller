@@ -130,6 +130,14 @@ class MainActivity : ComponentActivity() {
                     requestPermissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
                 }
             }
+            // Request overlay permission (SYSTEM_ALERT_WINDOW) if missing
+            if (!android.provider.Settings.canDrawOverlays(this)) {
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    android.net.Uri.parse("package:$packageName")
+                )
+                startActivity(intent)
+            }
         }
     }
 

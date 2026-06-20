@@ -17,6 +17,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.content.BroadcastReceiver
+import android.content.IntentFilter
+import com.moondrop.controller.ui.GlobalPopupManager
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -100,9 +103,36 @@ class BluetoothManager(
     private fun batteryRightFlow() = currentBatteryRight.asStateFlow()
 
     init {
+        // Register BroadcastReceiver for notification noise control buttons
+        val filter = IntentFilter("com.moondrop.controller.ACTION_SET_ANC")
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                intent?.let {
+                    val mode = it.getStringExtra("mode") ?: "Normal"
+                    setAncMode(mode)
+                }
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            context.registerReceiver(receiver, filter)
+        }
+
         scope.launch {
-            isConnected.collect {
+            isConnected.collect { connected ->
                 updateNotification()
+                if (connected) {
+                    // Show global connection popup overlay!
+                    scope.launch(Dispatchers.Main) {
+                        GlobalPopupManager.showPopup(context, this@BluetoothManager)
+                    }
+                } else {
+                    // Dismiss global popup overlay if disconnected
+                    scope.launch(Dispatchers.Main) {
+                        GlobalPopupManager.dismiss()
+                    }
+                }
             }
         }
         scope.launch {
@@ -155,6 +185,36 @@ class BluetoothManager(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        val transparencyIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
+            putExtra("mode", "Transparency")
+        }
+        val transparencyPending = PendingIntent.getBroadcast(
+            context,
+            1,
+            transparencyIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val ancIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
+            putExtra("mode", "ANC")
+        }
+        val ancPending = PendingIntent.getBroadcast(
+            context,
+            2,
+            ancIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val normalIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
+            putExtra("mode", "Normal")
+        }
+        val normalPending = PendingIntent.getBroadcast(
+            context,
+            3,
+            normalIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val ancStr = when (currentAnc.value) {
             "ANC" -> "降噪"
             "Transparency" -> "通透"
@@ -172,6 +232,9 @@ class BluetoothManager(
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pendingIntent)
+            .addAction(0, "通透", transparencyPending)
+            .addAction(0, "降噪", ancPending)
+            .addAction(0, "关闭", normalPending)
             .build()
 
         try {
