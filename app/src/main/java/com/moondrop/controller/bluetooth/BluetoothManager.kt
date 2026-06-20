@@ -131,6 +131,39 @@ class BluetoothManager(
             context.registerReceiver(receiver, filter)
         }
 
+        // Listen for OS-level Bluetooth connection broadcasts to trigger SPP socket instantly
+        val aclFilter = IntentFilter().apply {
+            addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
+            addAction(BluetoothDevice.ACTION_ACL_DISCONNECTED)
+        }
+        val aclReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                intent?.let {
+                    val action = it.action
+                    try {
+                        val device = it.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                        if (device != null) {
+                            val deviceName = device.name
+                            if (deviceName?.contains("MOONDROP", ignoreCase = true) == true) {
+                                if (action == BluetoothDevice.ACTION_ACL_CONNECTED) {
+                                    addLog("INFO", "System connected to $deviceName. Triggering SPP connection.")
+                                    connect(device)
+                                } else if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
+                                    addLog("WARNING", "System disconnected from $deviceName.")
+                                    disconnect()
+                                }
+                            }
+                        }
+                    } catch (e: SecurityException) {
+                        addLog("ERROR", "ACL broadcast receiver permission error: ${e.message}")
+                    } catch (e: Exception) {
+                        addLog("ERROR", "ACL broadcast receiver error: ${e.message}")
+                    }
+                }
+            }
+        }
+        context.registerReceiver(aclReceiver, aclFilter)
+
         // Update notification when connection status, ANC, or battery changes
         scope.launch {
             combine(isConnected, currentAnc, currentBatteryLeft, currentBatteryRight) { _, _, _, _ ->
@@ -310,7 +343,7 @@ class BluetoothManager(
             try {
                 disconnectInternal()
                 
-                socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
                 socket?.connect()
                 
                 inputStream = socket?.inputStream
@@ -458,8 +491,8 @@ class BluetoothManager(
         
         scope.launch {
             isReconnecting.value = true
-            addLog("WARNING", "Connection lost! Waiting 5s for device to restart before auto-reconnect...")
-            delay(5000)
+            addLog("WARNING", "Connection lost! Waiting 1s for device to restart before auto-reconnect...")
+            delay(1000)
             
             var attempt = 1
             val maxAttempts = 15
@@ -467,7 +500,7 @@ class BluetoothManager(
                 addLog("INFO", "Auto-reconnect attempt ($attempt/$maxAttempts)...")
                 try {
                     disconnectInternal()
-                    socket = device.createRfcommSocketToServiceRecord(SPP_UUID)
+                    socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
                     socket?.connect()
                     
                     inputStream = socket?.inputStream
@@ -480,7 +513,7 @@ class BluetoothManager(
                     break
                 } catch (e: Exception) {
                     attempt++
-                    delay(3000)
+                    delay(1500)
                 }
             }
             if (!isConnected.value) {
