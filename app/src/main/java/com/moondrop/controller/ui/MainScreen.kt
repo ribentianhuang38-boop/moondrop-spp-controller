@@ -124,18 +124,11 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     }
 
     // Connection Pop-up dialog states
-    var showConnectionPopup by remember { mutableStateOf(false) }
+    var showConnectionPopup by remember { mutableStateOf(true) }
     var hasShownPopupForCurrentConnection by remember { mutableStateOf(false) }
     LaunchedEffect(isConnected) {
-        if (isConnected) {
-            if (!hasShownPopupForCurrentConnection) {
-                showConnectionPopup = true
-                hasShownPopupForCurrentConnection = true
-            }
-        } else {
-            hasShownPopupForCurrentConnection = false
-            showConnectionPopup = false
-        }
+        // Temporarily forced to true for layout verification
+        showConnectionPopup = true
     }
 
     val savedPreGain = remember { bluetoothManager.getSavedPreGain() }
