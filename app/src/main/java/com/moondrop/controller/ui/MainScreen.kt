@@ -71,6 +71,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
 
     val batteryLeft by bluetoothManager.batteryLeft.collectAsState()
     val batteryRight by bluetoothManager.batteryRight.collectAsState()
+    val hasPermission by bluetoothManager.bluetoothPermissionState.collectAsState()
     
     val pairedDevices = remember { bluetoothManager.getPairedDevices() }
     var selectedDevice by remember { 
@@ -89,7 +90,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     
     // Splash screen states
     var isSplashScreenActive by remember { mutableStateOf(true) }
-    var splashVisible by remember { mutableStateOf(false) }
+    var splashVisible by remember { mutableStateOf(true) }
     
     val splashAlpha by animateFloatAsState(
         targetValue = if (splashVisible) 1f else 0f,
@@ -839,59 +840,114 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            // Centered headphone render with grey shadow background
-                            Image(
-                                painter = painterResource(id = R.drawable.headphone_render),
-                                contentDescription = "Moondrop Headphones",
-                                modifier = Modifier
-                                    .width(260.dp)
-                                    .height(180.dp)
-                                    .padding(bottom = 32.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                            
-                            Text(
-                                text = "DISCONNECTED",
-                                fontWeight = FontWeight.Bold,
-                                color = TextSecondary,
-                                fontSize = 11.sp,
-                                letterSpacing = 2.sp
-                            )
-                            
-                            Spacer(modifier = Modifier.height(6.dp))
-                            
-                            Text(
-                                text = "待连接",
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary,
-                                fontSize = 22.sp
-                            )
-                            
-                            Spacer(modifier = Modifier.height(12.dp))
-                            
-                            Text(
-                                text = "请确保耳机已开机并靠近手机。\n点击下方按钮或在顶部选择设备开始连接。",
-                                fontWeight = FontWeight.Normal,
-                                color = TextSecondary,
-                                fontSize = 12.sp,
-                                lineHeight = 18.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                            
-                            Spacer(modifier = Modifier.height(36.dp))
-                            
-                            Button(
-                                onClick = {
-                                    selectedDevice?.let { bluetoothManager.connect(it) }
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
-                                shape = RoundedCornerDefault,
-                                modifier = Modifier
-                                    .width(200.dp)
-                                    .height(48.dp)
-                            ) {
-                                Text("连接设备", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            if (!hasPermission) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.headphone_render),
+                                    contentDescription = "Moondrop Headphones",
+                                    modifier = Modifier
+                                        .width(260.dp)
+                                        .height(180.dp)
+                                        .padding(bottom = 32.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                
+                                Text(
+                                    text = "PERMISSION REQUIRED",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    letterSpacing = 2.sp
+                                )
+                                
+                                Spacer(modifier = Modifier.height(6.dp))
+                                
+                                Text(
+                                    text = "蓝牙权限未开启",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary,
+                                    fontSize = 22.sp
+                                )
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Text(
+                                    text = "应用需要蓝牙权限以扫描并控制您的 Moondrop 耳机。\n请点击下方按钮授予权限。",
+                                    fontWeight = FontWeight.Normal,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(36.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        bluetoothManager.requestBluetoothPermission()
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
+                                    shape = RoundedCornerDefault,
+                                    modifier = Modifier
+                                        .width(200.dp)
+                                        .height(48.dp)
+                                ) {
+                                    Text("授予权限", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                }
+                            } else {
+                                Image(
+                                    painter = painterResource(id = R.drawable.headphone_render),
+                                    contentDescription = "Moondrop Headphones",
+                                    modifier = Modifier
+                                        .width(260.dp)
+                                        .height(180.dp)
+                                        .padding(bottom = 32.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                
+                                Text(
+                                    text = "DISCONNECTED",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary,
+                                    fontSize = 11.sp,
+                                    letterSpacing = 2.sp
+                                )
+                                
+                                Spacer(modifier = Modifier.height(6.dp))
+                                
+                                Text(
+                                    text = "待连接",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary,
+                                    fontSize = 22.sp
+                                )
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Text(
+                                    text = "请确保耳机已开机并靠近手机。\n点击下方按钮或在顶部选择设备开始连接。",
+                                    fontWeight = FontWeight.Normal,
+                                    color = TextSecondary,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                
+                                Spacer(modifier = Modifier.height(36.dp))
+                                
+                                Button(
+                                    onClick = {
+                                        selectedDevice?.let { bluetoothManager.connect(it) }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
+                                    shape = RoundedCornerDefault,
+                                    modifier = Modifier
+                                        .width(200.dp)
+                                        .height(48.dp)
+                                ) {
+                                    Text("连接设备", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                }
                             }
                         }
                     }
@@ -902,10 +958,9 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         // Overlay: Splash screen
         if (isSplashScreenActive) {
             LaunchedEffect(Unit) {
-                splashVisible = true
-                delay(600)
+                delay(800)
                 splashVisible = false
-                delay(200)
+                delay(500)
                 isSplashScreenActive = false
             }
             Box(
@@ -972,175 +1027,187 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     .background(Color.Black.copy(alpha = 0.4f))
                     .clickable { showConnectionPopup = false }
             ) {
-                val infiniteTransition = rememberInfiniteTransition(label = "logo_float")
-                val floatTranslationY by infiniteTransition.animateFloat(
-                    initialValue = -6f,
-                    targetValue = 6f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1200, easing = EaseInOutSine),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "floatY"
-                )
-                val floatRotation by infiniteTransition.animateFloat(
-                    initialValue = -3f,
-                    targetValue = 3f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1800, easing = EaseInOutSine),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "floatRotation"
-                )
-
-                Column(
+                // Floating card wrapper
+                Box(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(BgWhite)
-                        .border(1.dp, BorderLight, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .clickable(enabled = true, onClick = {}) // prevent click propagation
-                        .padding(bottom = 32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 40.dp) // Suspend it above the bottom
                 ) {
-                    // Drag handle
-                    Box(
-                        modifier = Modifier
-                            .padding(vertical = 12.dp)
-                            .width(36.dp)
-                            .height(4.dp)
-                            .background(BorderLight, CircleShape)
-                    )
-
-                    // Upper Part: Suspended solid-tilted MOONDROP brand logo with floating micro-animation
-                    Box(
+                    // 1. The Dialog Card Body
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(80.dp),
+                            .background(BgWhite, RoundedCornerShape(24.dp))
+                            .border(1.dp, BorderLight, RoundedCornerShape(24.dp))
+                            .clickable(enabled = true, onClick = {}) // prevent click propagation
+                            .padding(top = 40.dp) // extra padding for overlapping badge
+                            .padding(bottom = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // Drag handle
+                        Box(
+                            modifier = Modifier
+                                .padding(vertical = 12.dp)
+                                .width(36.dp)
+                                .height(4.dp)
+                                .background(BorderLight, CircleShape)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "MOONDROP ULTRASONIC",
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            fontSize = 16.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Text(
+                            text = "已连接",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+
+                        // Main Body: Left/Right earbud battery status
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.headphone_left),
+                                    contentDescription = "Left Earbud",
+                                    modifier = Modifier.height(100.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "L  $batteryLeft%",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            }
+
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.headphone_right),
+                                    contentDescription = "Right Earbud",
+                                    modifier = Modifier.height(100.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "R  $batteryRight%",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+
+                        // Lower Part: Quick ANC toggle and dismiss button
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 40.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "NOISE CONTROL",
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary,
+                                fontSize = 10.sp,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            val ancItems = listOf("通透", "降噪", "关闭")
+                            val currentAncIndex = when (activeAnc) {
+                                "Transparency" -> 0
+                                "ANC" -> 1
+                                else -> 2
+                            }
+
+                            MinimalSegmentedControl(
+                                items = ancItems,
+                                selectedIndex = currentAncIndex,
+                                onItemSelection = { index ->
+                                    val mode = when (index) {
+                                        0 -> "Transparency"
+                                        1 -> "ANC"
+                                        else -> "Normal"
+                                    }
+                                    bluetoothManager.setAncMode(mode)
+                                }
+                            )
+
+                            Spacer(modifier = Modifier.height(28.dp))
+
+                            Button(
+                                onClick = { showConnectionPopup = false },
+                                colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
+                                shape = RoundedCornerDefault,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
+                            ) {
+                                Text("DONE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            }
+                        }
+                    }
+
+                    // 2. The Overlapping Logo Badge (half out of the top edge)
+                    val infiniteTransition = rememberInfiniteTransition(label = "logo_float")
+                    val floatTranslationY by infiniteTransition.animateFloat(
+                        initialValue = -4f,
+                        targetValue = 4f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = EaseInOutSine),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "floatY"
+                    )
+                    val floatRotation by infiniteTransition.animateFloat(
+                        initialValue = -3f,
+                        targetValue = 3f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1800, easing = EaseInOutSine),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "floatRotation"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (-32).dp)
+                            .size(64.dp)
+                            .background(Color(0xFF111111), CircleShape)
+                            .border(2.dp, BgWhite, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.ic_logo),
                             contentDescription = "Moondrop Logo",
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(36.dp)
                                 .graphicsLayer {
                                     translationY = floatTranslationY.dp.toPx()
                                     rotationZ = -8f + floatRotation
-                                },
-                            colorFilter = ColorFilter.tint(TextPrimary)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Text(
-                        text = "MOONDROP ULTRASONIC",
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        fontSize = 16.sp,
-                        letterSpacing = 1.sp
-                    )
-                    Text(
-                        text = "已连接",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-
-                    // Main Body: Left/Right earbud renders side-by-side with battery percentages
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.headphone_left),
-                                contentDescription = "Left Earbud",
-                                modifier = Modifier.height(100.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "L  $batteryLeft%",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
-
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Image(
-                                painter = painterResource(id = R.drawable.headphone_right),
-                                contentDescription = "Right Earbud",
-                                modifier = Modifier.height(100.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "R  $batteryRight%",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
-                    }
-
-                    // Lower Part: Quick ANC toggle controls and a dismiss button
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 40.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "NOISE CONTROL",
-                            fontWeight = FontWeight.Bold,
-                            color = TextSecondary,
-                            fontSize = 10.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-
-                        val ancItems = listOf("通透", "降噪", "关闭")
-                        val currentAncIndex = when (activeAnc) {
-                            "Transparency" -> 0
-                            "ANC" -> 1
-                            else -> 2
-                        }
-
-                        MinimalSegmentedControl(
-                            items = ancItems,
-                            selectedIndex = currentAncIndex,
-                            onItemSelection = { index ->
-                                val mode = when (index) {
-                                    0 -> "Transparency"
-                                    1 -> "ANC"
-                                    else -> "Normal"
                                 }
-                                bluetoothManager.setAncMode(mode)
-                            }
                         )
-
-                        Spacer(modifier = Modifier.height(28.dp))
-
-                        Button(
-                            onClick = { showConnectionPopup = false },
-                            colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
-                            shape = RoundedCornerDefault,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(48.dp)
-                        ) {
-                            Text("DONE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        }
                     }
                 }
             }

@@ -57,6 +57,8 @@ class BluetoothManager(
     private val currentSystemVolume = MutableStateFlow(0)
     private val maxSystemVolume = MutableStateFlow(15)
 
+    private val hasBluetoothPermission = MutableStateFlow(true)
+
     // Battery values (simulated or real if queried)
     private val currentBatteryCase = MutableStateFlow(100)
     private val currentBatteryLeft = MutableStateFlow(100)
@@ -77,6 +79,18 @@ class BluetoothManager(
     
     val systemVolume = currentSystemVolume.asStateFlow()
     val maxVolume = maxSystemVolume.asStateFlow()
+    
+    val bluetoothPermissionState = hasBluetoothPermission.asStateFlow()
+    
+    var onRequestPermission: (() -> Unit)? = null
+    
+    fun setBluetoothPermissionState(granted: Boolean) {
+        hasBluetoothPermission.value = granted
+    }
+    
+    fun requestBluetoothPermission() {
+        onRequestPermission?.invoke()
+    }
 
     val batteryCase = currentBatteryCase.asStateFlow()
     val batteryLeft = batteryLeftFlow()

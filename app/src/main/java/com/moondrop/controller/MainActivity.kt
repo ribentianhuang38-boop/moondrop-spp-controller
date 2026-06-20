@@ -32,9 +32,10 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val granted = permissions.entries.all { it.value }
         if (granted) {
+            bluetoothManager.setBluetoothPermissionState(true)
             initBluetooth()
         } else {
-            Toast.makeText(this, "Bluetooth permissions are required for SPP control", Toast.LENGTH_LONG).show()
+            bluetoothManager.setBluetoothPermissionState(false)
         }
     }
 
@@ -76,6 +77,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        bluetoothManager.onRequestPermission = {
+            checkPermissions()
+        }
+
         checkPermissions()
     }
 
@@ -97,8 +102,10 @@ class MainActivity : ComponentActivity() {
         }
 
         if (missing.isNotEmpty()) {
+            bluetoothManager.setBluetoothPermissionState(false)
             requestPermissionLauncher.launch(missing.toTypedArray())
         } else {
+            bluetoothManager.setBluetoothPermissionState(true)
             initBluetooth()
         }
     }
