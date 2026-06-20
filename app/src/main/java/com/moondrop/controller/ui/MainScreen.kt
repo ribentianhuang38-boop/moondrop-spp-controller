@@ -102,23 +102,40 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         label = "splashScale"
     )
 
-    // EQ bands local state
+    // Connection Pop-up dialog states
+    var showConnectionPopup by remember { mutableStateOf(false) }
+    var hasShownPopupForCurrentConnection by remember { mutableStateOf(false) }
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            if (!hasShownPopupForCurrentConnection) {
+                showConnectionPopup = true
+                hasShownPopupForCurrentConnection = true
+            }
+        } else {
+            hasShownPopupForCurrentConnection = false
+            showConnectionPopup = false
+        }
+    }
+
+    val savedPreGain = remember { bluetoothManager.getSavedPreGain() }
+    val savedGains = remember { bluetoothManager.getSavedBandGains() }
+    
     val defaultBands = remember {
         listOf(
-            BandConfig(31, 1.0f, 13, 0.0f),
-            BandConfig(62, 1.0f, 13, 0.0f),
-            BandConfig(125, 1.0f, 13, 0.0f),
-            BandConfig(250, 1.0f, 13, 0.0f),
-            BandConfig(500, 1.0f, 13, 0.0f),
-            BandConfig(1000, 1.0f, 13, 0.0f),
-            BandConfig(2000, 1.0f, 13, 0.0f),
-            BandConfig(4000, 1.0f, 13, 0.0f),
-            BandConfig(8000, 1.0f, 13, 0.0f),
-            BandConfig(16000, 1.0f, 13, 0.0f)
+            BandConfig(31, 1.0f, 13, savedGains.getOrElse(0) { 0.0f }),
+            BandConfig(62, 1.0f, 13, savedGains.getOrElse(1) { 0.0f }),
+            BandConfig(125, 1.0f, 13, savedGains.getOrElse(2) { 0.0f }),
+            BandConfig(250, 1.0f, 13, savedGains.getOrElse(3) { 0.0f }),
+            BandConfig(500, 1.0f, 13, savedGains.getOrElse(4) { 0.0f }),
+            BandConfig(1000, 1.0f, 13, savedGains.getOrElse(5) { 0.0f }),
+            BandConfig(2000, 1.0f, 13, savedGains.getOrElse(6) { 0.0f }),
+            BandConfig(4000, 1.0f, 13, savedGains.getOrElse(7) { 0.0f }),
+            BandConfig(8000, 1.0f, 13, savedGains.getOrElse(8) { 0.0f }),
+            BandConfig(16000, 1.0f, 13, savedGains.getOrElse(9) { 0.0f })
         )
     }
     val eqBands = remember { mutableStateListOf<BandConfig>().apply { addAll(defaultBands) } }
-    var preGain by remember { mutableStateOf(-3.0f) }
+    var preGain by remember { mutableStateOf(savedPreGain) }
     
     val listState = rememberLazyListState()
 
@@ -199,53 +216,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         }
     }
 
-    if (isSplashScreenActive) {
-        LaunchedEffect(Unit) {
-            splashVisible = true
-            delay(600)
-            splashVisible = false
-            delay(200)
-            isSplashScreenActive = false
-        }
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(BgWhite),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.graphicsLayer(
-                    alpha = splashAlpha,
-                    scaleX = splashScale,
-                    scaleY = splashScale
-                )
-            ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_logo),
-                    contentDescription = "Moondrop Logo",
-                    modifier = Modifier.size(80.dp),
-                    colorFilter = ColorFilter.tint(TextPrimary)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = "MOONDROP",
-                    letterSpacing = 4.sp,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "U L T R A S O N I C",
-                    letterSpacing = 2.sp,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextSecondary
-                )
-            }
-        }
-    } else {
+    Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             topBar = {
                 TopAppBar(
@@ -927,6 +898,254 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 }
             }
         }
+
+        // Overlay: Splash screen
+        if (isSplashScreenActive) {
+            LaunchedEffect(Unit) {
+                splashVisible = true
+                delay(600)
+                splashVisible = false
+                delay(200)
+                isSplashScreenActive = false
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgWhite.copy(alpha = splashAlpha))
+                    .graphicsLayer {
+                        alpha = splashAlpha
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.graphicsLayer(
+                        scaleX = splashScale,
+                        scaleY = splashScale
+                    )
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_logo),
+                        contentDescription = "Moondrop Logo",
+                        modifier = Modifier.size(80.dp),
+                        colorFilter = ColorFilter.tint(TextPrimary)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "MOONDROP",
+                        letterSpacing = 4.sp,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "U L T R A S O N I C",
+                        letterSpacing = 2.sp,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextSecondary
+                    )
+                }
+            }
+        }
+
+        // Overlay: AirPods-style bottom slide-up pop-up upon connection
+        AnimatedVisibility(
+            visible = showConnectionPopup,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioLowBouncy,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            ) + fadeIn(),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
+            ) + fadeOut(),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable { showConnectionPopup = false }
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "logo_float")
+                val floatTranslationY by infiniteTransition.animateFloat(
+                    initialValue = -6f,
+                    targetValue = 6f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1200, easing = EaseInOutSine),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "floatY"
+                )
+                val floatRotation by infiniteTransition.animateFloat(
+                    initialValue = -3f,
+                    targetValue = 3f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1800, easing = EaseInOutSine),
+                        repeatMode = RepeatMode.Reverse
+                    ),
+                    label = "floatRotation"
+                )
+
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .background(BgWhite)
+                        .border(1.dp, BorderLight, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                        .clickable(enabled = true, onClick = {}) // prevent click propagation
+                        .padding(bottom = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Drag handle
+                    Box(
+                        modifier = Modifier
+                            .padding(vertical = 12.dp)
+                            .width(36.dp)
+                            .height(4.dp)
+                            .background(BorderLight, CircleShape)
+                    )
+
+                    // Upper Part: Suspended solid-tilted MOONDROP brand logo with floating micro-animation
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_logo),
+                            contentDescription = "Moondrop Logo",
+                            modifier = Modifier
+                                .size(48.dp)
+                                .graphicsLayer {
+                                    translationY = floatTranslationY.dp.toPx()
+                                    rotationZ = -8f + floatRotation
+                                },
+                            colorFilter = ColorFilter.tint(TextPrimary)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "MOONDROP ULTRASONIC",
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary,
+                        fontSize = 16.sp,
+                        letterSpacing = 1.sp
+                    )
+                    Text(
+                        text = "已连接",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+
+                    // Main Body: Left/Right earbud renders side-by-side with battery percentages
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.headphone_left),
+                                contentDescription = "Left Earbud",
+                                modifier = Modifier.height(100.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "L  $batteryLeft%",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Image(
+                                painter = painterResource(id = R.drawable.headphone_right),
+                                contentDescription = "Right Earbud",
+                                modifier = Modifier.height(100.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "R  $batteryRight%",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+
+                    // Lower Part: Quick ANC toggle controls and a dismiss button
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 40.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "NOISE CONTROL",
+                            fontWeight = FontWeight.Bold,
+                            color = TextSecondary,
+                            fontSize = 10.sp,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        val ancItems = listOf("通透", "降噪", "关闭")
+                        val currentAncIndex = when (activeAnc) {
+                            "Transparency" -> 0
+                            "ANC" -> 1
+                            else -> 2
+                        }
+
+                        MinimalSegmentedControl(
+                            items = ancItems,
+                            selectedIndex = currentAncIndex,
+                            onItemSelection = { index ->
+                                val mode = when (index) {
+                                    0 -> "Transparency"
+                                    1 -> "ANC"
+                                    else -> "Normal"
+                                }
+                                bluetoothManager.setAncMode(mode)
+                            }
+                        )
+
+                        Spacer(modifier = Modifier.height(28.dp))
+
+                        Button(
+                            onClick = { showConnectionPopup = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = TextPrimary),
+                            shape = RoundedCornerDefault,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                        ) {
+                            Text("DONE", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
     }
 }
 

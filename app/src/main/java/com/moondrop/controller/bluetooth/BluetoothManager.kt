@@ -1,9 +1,16 @@
 package com.moondrop.controller.bluetooth
 
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -17,11 +24,16 @@ import java.util.UUID
 
 @SuppressLint("MissingPermission")
 class BluetoothManager(
+    private val context: Context,
     private val bluetoothAdapter: BluetoothAdapter?,
     private val audioManager: android.media.AudioManager? = null
 ) {
 
     private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
+    
+    private val CHANNEL_ID = "moondrop_controller_status"
+    private val NOTIFICATION_ID = 1001
+    private val prefs = context.getSharedPreferences("moondrop_settings", Context.MODE_PRIVATE)
     
     private var socket: BluetoothSocket? = null
     private var inputStream: InputStream? = null
@@ -37,7 +49,7 @@ class BluetoothManager(
 
     private val currentAnc = MutableStateFlow("Normal")
     private val currentGain = MutableStateFlow("Medium")
-    private val selectedPreset = MutableStateFlow(0)
+    private val selectedPreset = MutableStateFlow(prefs.getInt("selected_preset", 6))
     
     private val isLdacEnabled = MutableStateFlow(false)
     private val isLc3Enabled = MutableStateFlow(false)
@@ -72,6 +84,100 @@ class BluetoothManager(
 
     private fun batteryLeftFlow() = currentBatteryLeft.asStateFlow()
     private fun batteryRightFlow() = currentBatteryRight.asStateFlow()
+
+    init {
+        scope.launch {
+            isConnected.collect {
+                updateNotification()
+            }
+        }
+        scope.launch {
+            currentAnc.collect {
+                updateNotification()
+            }
+        }
+        scope.launch {
+            currentBatteryLeft.collect {
+                updateNotification()
+            }
+        }
+        scope.launch {
+            currentBatteryRight.collect {
+                updateNotification()
+            }
+        }
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "Headset Status"
+            val descriptionText = "Displays connection status, battery, and ANC mode."
+            val importance = NotificationManager.IMPORTANCE_LOW
+            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
+                description = descriptionText
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun updateNotification() {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        
+        if (!isConnected.value) {
+            notificationManager.cancel(NOTIFICATION_ID)
+            return
+        }
+
+        createNotificationChannel()
+
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val ancStr = when (currentAnc.value) {
+            "ANC" -> "降噪"
+            "Transparency" -> "通透"
+            "Normal" -> "普通"
+            else -> "普通"
+        }
+
+        val title = "${currentConnectedDevice.value?.name ?: "MOONDROP ULTRASONIC"} 已连接"
+        val content = "左耳: ${currentBatteryLeft.value}% | 右耳: ${currentBatteryRight.value}% | 模式: $ancStr"
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        try {
+            notificationManager.notify(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            // Log warning if error occurs
+        }
+    }
+
+    fun getSavedPreGain(): Float {
+        return prefs.getFloat("custom_pre_gain", -3.0f)
+    }
+
+    fun getSavedBandGains(): List<Float> {
+        val list = mutableListOf<Float>()
+        for (i in 0 until 10) {
+            list.add(prefs.getFloat("custom_band_gain_$i", 0.0f))
+        }
+        return list
+    }
 
     data class LogEntry(val time: String, val direction: String, val message: String)
 
@@ -126,7 +232,36 @@ class BluetoothManager(
                     delay(250)
                     sendHex("ff040000001d1e01") // Query Gain
                     delay(250)
-                    sendHex("ff040000001d0a02") // Query EQ Preset
+                    
+                    val savedPresetId = prefs.getInt("selected_preset", 6)
+                    if (savedPresetId == 63) {
+                        val gains = getSavedBandGains()
+                        val preGainVal = getSavedPreGain()
+                        val bands = listOf(
+                            BandConfig(31, 1.0f, 13, gains.getOrElse(0) { 0.0f }),
+                            BandConfig(62, 1.0f, 13, gains.getOrElse(1) { 0.0f }),
+                            BandConfig(125, 1.0f, 13, gains.getOrElse(2) { 0.0f }),
+                            BandConfig(250, 1.0f, 13, gains.getOrElse(3) { 0.0f }),
+                            BandConfig(500, 1.0f, 13, gains.getOrElse(4) { 0.0f }),
+                            BandConfig(1000, 1.0f, 13, gains.getOrElse(5) { 0.0f }),
+                            BandConfig(2000, 1.0f, 13, gains.getOrElse(6) { 0.0f }),
+                            BandConfig(4000, 1.0f, 13, gains.getOrElse(7) { 0.0f }),
+                            BandConfig(8000, 1.0f, 13, gains.getOrElse(8) { 0.0f }),
+                            BandConfig(16000, 1.0f, 13, gains.getOrElse(9) { 0.0f })
+                        )
+                        sendCustomEQ(preGainVal, bands)
+                    } else {
+                        selectEQPreset(savedPresetId)
+                    }
+                }
+                
+                // Launch ANC polling loop (every 2 seconds)
+                scope.launch {
+                    delay(2000)
+                    while (isConnected.value) {
+                        sendHex("ff040000001d1003")
+                        delay(2000)
+                    }
                 }
                 
                 startReadLoop(device)
@@ -411,6 +546,7 @@ class BluetoothManager(
 
     fun selectEQPreset(presetId: Int) {
         selectedPreset.value = presetId
+        prefs.edit().putInt("selected_preset", presetId).apply()
         val packet = byteArrayOf(
             0xff.toByte(), 0x04.toByte(),
             0x00.toByte(), 0x01.toByte(),
@@ -463,6 +599,11 @@ class BluetoothManager(
 
     fun sendCustomEQ(preGain: Float, bands: List<BandConfig>) {
         selectedPreset.value = 63 // User EQ
+        prefs.edit().putInt("selected_preset", 63).apply()
+        prefs.edit().putFloat("custom_pre_gain", preGain).apply()
+        for (i in bands.indices) {
+            prefs.edit().putFloat("custom_band_gain_$i", bands[i].gain).apply()
+        }
         if (bands.isEmpty()) return
         val startBand = 0
         val endBand = bands.size - 1

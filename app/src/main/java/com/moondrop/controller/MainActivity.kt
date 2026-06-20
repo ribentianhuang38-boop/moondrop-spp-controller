@@ -43,7 +43,7 @@ class MainActivity : ComponentActivity() {
         
         val adapter = (getSystemService(AndroidBluetoothManager::class.java))?.adapter
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        bluetoothManager = BluetoothManager(adapter, audioManager)
+        bluetoothManager = BluetoothManager(this, adapter, audioManager)
 
         // Initialize volume levels
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -87,6 +87,9 @@ class MainActivity : ComponentActivity() {
         } else {
             permissions.add(Manifest.permission.BLUETOOTH)
             permissions.add(Manifest.permission.BLUETOOTH_ADMIN)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         val missing = permissions.filter {
