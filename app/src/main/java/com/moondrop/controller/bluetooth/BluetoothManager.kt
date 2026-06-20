@@ -32,6 +32,17 @@ class BluetoothManager(
     private val audioManager: android.media.AudioManager? = null
 ) {
 
+    companion object {
+        @Volatile
+        private var instance: BluetoothManager? = null
+
+        fun getInstance(context: Context, bluetoothAdapter: BluetoothAdapter?, audioManager: android.media.AudioManager?): BluetoothManager {
+            return instance ?: synchronized(this) {
+                instance ?: BluetoothManager(context.applicationContext, bluetoothAdapter, audioManager).also { instance = it }
+            }
+        }
+    }
+
     private val SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805f9b34fb")
     
     private val CHANNEL_ID = "moondrop_controller_status"

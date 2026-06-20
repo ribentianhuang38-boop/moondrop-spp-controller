@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
         
         val adapter = (getSystemService(AndroidBluetoothManager::class.java))?.adapter
         val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        bluetoothManager = BluetoothManager(this, adapter, audioManager)
+        bluetoothManager = BluetoothManager.getInstance(this, adapter, audioManager)
 
         // Initialize volume levels
         val currentVol = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)

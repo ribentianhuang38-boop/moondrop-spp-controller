@@ -36,6 +36,11 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.moondrop.controller.R
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.runtime.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 object GlobalPopupManager {
     private var currentView: View? = null
@@ -69,154 +74,191 @@ object GlobalPopupManager {
             val batteryRight by bluetoothManager.batteryRight.collectAsState()
             val activeAnc by bluetoothManager.ancMode.collectAsState()
 
+            var visible by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                visible = true
+            }
+
+            val coroutineScope = rememberCoroutineScope()
+            val handleDismiss = {
+                coroutineScope.launch {
+                    visible = false
+                    delay(300)
+                    dismiss()
+                }
+            }
+
             MaterialTheme {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.4f))
-                        .clickable { dismiss() }
+                AnimatedVisibility(
+                    visible = visible,
+                    enter = fadeIn(animationSpec = tween(300)),
+                    exit = fadeOut(animationSpec = tween(300))
                 ) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .width(360.dp)
-                            .padding(horizontal = 24.dp)
-                            .padding(bottom = 80.dp)
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clickable { handleDismiss() }
                     ) {
-                        Column(
+                        AnimatedVisibility(
+                            visible = visible,
+                            enter = slideInVertically(
+                                initialOffsetY = { it },
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioLowBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                )
+                            ) + fadeIn(),
+                            exit = slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
+                            ) + fadeOut(),
                             modifier = Modifier
-                                .background(Color.Black, RoundedCornerShape(24.dp))
-                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
-                                .clickable(enabled = true, onClick = {})
-                                .padding(top = 48.dp)
-                                .padding(bottom = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                                .align(Alignment.BottomCenter)
+                                .width(360.dp)
+                                .padding(horizontal = 24.dp)
+                                .padding(bottom = 80.dp)
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(vertical = 12.dp)
-                                    .width(36.dp)
-                                    .height(4.dp)
-                                    .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                            )
-
-                            Spacer(modifier = Modifier.height(8.dp))
-
-                            Text(
-                                text = "MOONDROP ULTRASONIC",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White,
-                                fontSize = 16.sp,
-                                letterSpacing = 1.sp
-                            )
-                            Text(
-                                text = "已连接",
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 12.sp
-                            )
-
-                            Row(
-                                modifier = Modifier
-                                    .padding(vertical = 24.dp),
-                                horizontalArrangement = Arrangement.SpaceEvenly,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Box {
                                 Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.headphone_left),
-                                        contentDescription = "Left Earbud",
-                                        modifier = Modifier.height(100.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "L  $batteryLeft%",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Image(
-                                        painter = painterResource(id = R.drawable.headphone_right),
-                                        contentDescription = "Right Earbud",
-                                        modifier = Modifier.height(100.dp),
-                                        contentScale = ContentScale.Fit
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = "R  $batteryRight%",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                }
-                            }
-
-                            Column(
-                                modifier = Modifier
-                                    .padding(horizontal = 40.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                Text(
-                                    text = "NOISE CONTROL",
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White.copy(alpha = 0.6f),
-                                    fontSize = 10.sp,
-                                    letterSpacing = 1.sp
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-
-                                val ancItems = listOf("通透", "降噪", "关闭")
-                                val currentAncIndex = when (activeAnc) {
-                                    "Transparency" -> 0
-                                    "ANC" -> 1
-                                    else -> 2
-                                }
-
-                                MinimalSegmentedControl(
-                                    items = ancItems,
-                                    selectedIndex = currentAncIndex,
-                                    onItemSelection = { index ->
-                                        val mode = when (index) {
-                                            0 -> "Transparency"
-                                            1 -> "ANC"
-                                            else -> "Normal"
-                                        }
-                                        bluetoothManager.setAncMode(mode)
-                                    },
-                                    isDark = true
-                                )
-
-                                Spacer(modifier = Modifier.height(28.dp))
-
-                                Button(
-                                    onClick = { dismiss() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                    shape = RoundedCornerShape(16.dp),
                                     modifier = Modifier
-                                        .height(48.dp)
+                                        .fillMaxWidth()
+                                        .background(Color.Black, RoundedCornerShape(24.dp))
+                                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+                                        .clickable(enabled = true, onClick = {})
+                                        .padding(top = 48.dp)
+                                        .padding(bottom = 24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text("DONE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(vertical = 12.dp)
+                                            .width(36.dp)
+                                            .height(4.dp)
+                                            .background(Color.White.copy(alpha = 0.2f), CircleShape)
+                                    )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Text(
+                                        text = "MOONDROP ULTRASONIC",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        letterSpacing = 1.sp
+                                    )
+                                    Text(
+                                        text = "已连接",
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        fontSize = 12.sp
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .padding(vertical = 24.dp),
+                                        horizontalArrangement = Arrangement.SpaceEvenly,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.headphone_left),
+                                                contentDescription = "Left Earbud",
+                                                modifier = Modifier.height(100.dp),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "L  $batteryLeft%",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            modifier = Modifier.weight(1f)
+                                        ) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.headphone_right),
+                                                contentDescription = "Right Earbud",
+                                                modifier = Modifier.height(100.dp),
+                                                contentScale = ContentScale.Fit
+                                            )
+                                            Spacer(modifier = Modifier.height(8.dp))
+                                            Text(
+                                                text = "R  $batteryRight%",
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
+
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 40.dp),
+                                        horizontalAlignment = Alignment.CenterHorizontally
+                                    ) {
+                                        Text(
+                                            text = "NOISE CONTROL",
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White.copy(alpha = 0.6f),
+                                            fontSize = 10.sp,
+                                            letterSpacing = 1.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(12.dp))
+
+                                        val ancItems = listOf("通透", "降噪", "关闭")
+                                        val currentAncIndex = when (activeAnc) {
+                                            "Transparency" -> 0
+                                            "ANC" -> 1
+                                            else -> 2
+                                        }
+
+                                        MinimalSegmentedControl(
+                                            items = ancItems,
+                                            selectedIndex = currentAncIndex,
+                                            onItemSelection = { index ->
+                                                val mode = when (index) {
+                                                    0 -> "Transparency"
+                                                    1 -> "ANC"
+                                                    else -> "Normal"
+                                                }
+                                                bluetoothManager.setAncMode(mode)
+                                            },
+                                            isDark = true
+                                        )
+
+                                        Spacer(modifier = Modifier.height(28.dp))
+
+                                        Button(
+                                            onClick = { handleDismiss() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                                            shape = RoundedCornerShape(16.dp),
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .height(48.dp)
+                                        ) {
+                                            Text("DONE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        }
+                                    }
                                 }
+
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_logo_transparent),
+                                    contentDescription = "Moondrop Logo",
+                                    modifier = Modifier
+                                        .align(Alignment.TopStart)
+                                        .offset(x = 24.dp, y = (-40).dp)
+                                        .size(80.dp)
+                                )
                             }
                         }
-
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_logo_transparent),
-                            contentDescription = "Moondrop Logo",
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .offset(x = 24.dp, y = (-40).dp)
-                                .size(80.dp)
-                        )
                     }
                 }
             }
