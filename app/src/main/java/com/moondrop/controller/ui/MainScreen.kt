@@ -982,10 +982,8 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 splashVisible = false
                 delay(500)
                 isSplashScreenActive = false
-                // Trigger permission request after splash finishes!
-                if (!hasPermission) {
-                    bluetoothManager.requestBluetoothPermission()
-                }
+                // ALWAYS trigger permission check after splash finishes to check Bluetooth, Notification, and Overlay permissions
+                bluetoothManager.requestBluetoothPermission()
             }
             Box(
                 modifier = Modifier

@@ -42,6 +42,8 @@ class MainActivity : ComponentActivity() {
         if (bluetoothGranted) {
             bluetoothManager.setBluetoothPermissionState(true)
             initBluetooth()
+            // Cascade check for notification and overlay permissions
+            checkPermissions()
         } else {
             bluetoothManager.setBluetoothPermissionState(false)
         }
