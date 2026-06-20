@@ -80,6 +80,7 @@ object GlobalPopupManager {
 
             var visible by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
+                delay(200) // Wait for WindowManager to lay out the window and settle CPU spike
                 visible = true
             }
 
@@ -101,7 +102,7 @@ object GlobalPopupManager {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f))
+                            .background(Color.Transparent)
                             .clickable { handleDismiss() }
                     ) {
                         AnimatedVisibility(
