@@ -1002,19 +1002,11 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         alpha = 1f
                     )
                 ) {
-                    // Black-background white-text logo badge (rounded square)
-                    Box(
-                        modifier = Modifier
-                            .size(120.dp)
-                            .background(Color.Black, RoundedCornerShape(24.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_logo),
-                            contentDescription = "Moondrop Logo",
-                            modifier = Modifier.size(80.dp)
-                        )
-                    }
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_logo),
+                        contentDescription = "Moondrop Logo",
+                        modifier = Modifier.size(100.dp)
+                    )
                     Spacer(modifier = Modifier.height(24.dp))
                     Text(
                         text = "MOONDROP",
