@@ -131,24 +131,31 @@ class BluetoothManager(
             context.registerReceiver(receiver, filter)
         }
 
+        // Update notification when connection status, ANC, or battery changes
         scope.launch {
-            combine(isConnected, currentAnc, currentBatteryLeft, currentBatteryRight) { connected, _, _, _ ->
-                connected
-            }.collect { connected ->
+            combine(isConnected, currentAnc, currentBatteryLeft, currentBatteryRight) { _, _, _, _ ->
+                Unit
+            }.collect {
                 updateNotification()
-                if (connected) {
-                    // Show global connection popup overlay ONLY if the app is in the background!
+            }
+        }
+
+        // Show global popup ONLY on connection transition (from disconnected to connected)
+        scope.launch {
+            var wasConnected = false
+            isConnected.collect { connected ->
+                if (connected && !wasConnected) {
                     if (!com.moondrop.controller.MainActivity.isAppInForeground) {
                         scope.launch(Dispatchers.Main) {
                             GlobalPopupManager.showPopup(context, this@BluetoothManager)
                         }
                     }
-                } else {
-                    // Dismiss global popup overlay if disconnected
+                } else if (!connected && wasConnected) {
                     scope.launch(Dispatchers.Main) {
                         GlobalPopupManager.dismiss()
                     }
                 }
+                wasConnected = connected
             }
         }
     }
