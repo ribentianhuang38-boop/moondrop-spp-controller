@@ -1146,7 +1146,6 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
             }
         }
     }
-    }
 }
 
 // ─── Custom Flat Segmented Control ─────────────────────────────
