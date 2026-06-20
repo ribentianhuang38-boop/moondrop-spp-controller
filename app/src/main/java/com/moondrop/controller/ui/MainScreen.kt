@@ -77,12 +77,15 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     val batteryRight by bluetoothManager.batteryRight.collectAsState()
     val hasPermission by bluetoothManager.bluetoothPermissionState.collectAsState()
     
-    val pairedDevices = remember { bluetoothManager.getPairedDevices() }
-    var selectedDevice by remember { 
-        mutableStateOf<BluetoothDevice?>(
-            pairedDevices.firstOrNull { it.name?.contains("MOONDROP", ignoreCase = true) == true } 
+    val pairedDevices = remember(hasPermission) { 
+        if (hasPermission) bluetoothManager.getPairedDevices() else emptyList() 
+    }
+    var selectedDevice by remember { mutableStateOf<BluetoothDevice?>(null) }
+    LaunchedEffect(pairedDevices) {
+        if (selectedDevice == null && pairedDevices.isNotEmpty()) {
+            selectedDevice = pairedDevices.firstOrNull { it.name?.contains("MOONDROP", ignoreCase = true) == true }
                 ?: pairedDevices.firstOrNull()
-        ) 
+        }
     }
     var dropdownExpanded by remember { mutableStateOf(false) }
     

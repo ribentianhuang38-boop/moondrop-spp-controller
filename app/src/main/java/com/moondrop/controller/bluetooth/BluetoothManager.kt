@@ -221,7 +221,11 @@ class BluetoothManager(
     }
 
     fun getPairedDevices(): List<BluetoothDevice> {
-        return bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
+        return try {
+            bluetoothAdapter?.bondedDevices?.toList() ?: emptyList()
+        } catch (e: SecurityException) {
+            emptyList()
+        }
     }
 
     fun connect(device: BluetoothDevice) {
