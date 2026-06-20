@@ -42,10 +42,14 @@ import androidx.compose.runtime.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+import kotlin.OptIn
+import androidx.compose.animation.ExperimentalAnimationApi
+
 object GlobalPopupManager {
     private var currentView: View? = null
     private var lifecycleOwner: FloatingLifecycleOwner? = null
 
+    @OptIn(ExperimentalAnimationApi::class)
     fun showPopup(context: Context, bluetoothManager: BluetoothManager) {
         // If overlays are not permitted, do nothing
         if (!Settings.canDrawOverlays(context)) {
