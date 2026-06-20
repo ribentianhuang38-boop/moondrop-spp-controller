@@ -21,6 +21,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import com.moondrop.controller.bluetooth.BluetoothManager
+import com.moondrop.controller.ui.GlobalPopupManager
 import com.moondrop.controller.ui.MainScreen
 
 class MainActivity : ComponentActivity() {
@@ -152,6 +153,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         isAppInForeground = true
+        GlobalPopupManager.dismiss()
     }
 
     override fun onStop() {
