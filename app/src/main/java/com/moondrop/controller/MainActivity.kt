@@ -175,5 +175,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         var isAppInForeground = false
+        var hasSplashShown = false
     }
 }

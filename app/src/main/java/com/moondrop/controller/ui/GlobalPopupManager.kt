@@ -102,17 +102,8 @@ object GlobalPopupManager {
                     ) {
                         AnimatedVisibility(
                             visible = visible,
-                            enter = slideInVertically(
-                                initialOffsetY = { it },
-                                animationSpec = spring(
-                                    dampingRatio = Spring.DampingRatioLowBouncy,
-                                    stiffness = Spring.StiffnessMediumLow
-                                )
-                            ) + fadeIn(),
-                            exit = slideOutVertically(
-                                targetOffsetY = { it },
-                                animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
-                            ) + fadeOut(),
+                            enter = EnterTransition.None,
+                            exit = ExitTransition.None,
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .width(360.dp)
@@ -123,6 +114,19 @@ object GlobalPopupManager {
                             Box {
                                 Column(
                                     modifier = Modifier
+                                        .animateEnterExit(
+                                            enter = slideInVertically(
+                                                initialOffsetY = { it },
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.65f, // low/medium bounce
+                                                    stiffness = 180f      // snappy slide up
+                                                )
+                                            ) + fadeIn(),
+                                            exit = slideOutVertically(
+                                                targetOffsetY = { it },
+                                                animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
+                                            ) + fadeOut()
+                                        )
                                         .fillMaxWidth()
                                         .background(Color.Black, RoundedCornerShape(24.dp))
                                         .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
@@ -257,6 +261,22 @@ object GlobalPopupManager {
                                         .align(Alignment.TopStart)
                                         .offset(x = 24.dp, y = (-40).dp)
                                         .size(80.dp)
+                                        .animateEnterExit(
+                                            enter = slideInVertically(
+                                                initialOffsetY = { -it * 5 },
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.55f, // satisfying organic bounce
+                                                    stiffness = 120f      // sweeping flight speed
+                                                )
+                                            ) + slideInHorizontally(
+                                                initialOffsetX = { -it * 4 },
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.55f,
+                                                    stiffness = 120f
+                                                )
+                                            ) + fadeIn(animationSpec = tween(400)),
+                                            exit = slideOutVertically(targetOffsetY = { it * 2 }) + fadeOut()
+                                        )
                                 )
                             }
                         }

@@ -96,8 +96,12 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     var showAdvanced by remember { mutableStateOf(false) }
     
     // Splash screen states
-    var isSplashScreenActive by rememberSaveable { mutableStateOf(true) }
-    var splashVisible by rememberSaveable { mutableStateOf(true) }
+    var isSplashScreenActive by rememberSaveable { 
+        mutableStateOf(!com.moondrop.controller.MainActivity.hasSplashShown) 
+    }
+    var splashVisible by rememberSaveable { 
+        mutableStateOf(!com.moondrop.controller.MainActivity.hasSplashShown) 
+    }
     var splashTextVisible by remember { mutableStateOf(false) }
     
     val splashAlpha by animateFloatAsState(
@@ -124,20 +128,13 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         }
     }
 
-    // Connection Pop-up dialog states
-    var showConnectionPopup by remember { mutableStateOf(false) }
-    var hasShownPopupForCurrentConnection by remember { mutableStateOf(false) }
-    LaunchedEffect(isConnected) {
-        if (isConnected) {
-            if (!hasShownPopupForCurrentConnection) {
-                showConnectionPopup = true
-                hasShownPopupForCurrentConnection = true
-            }
-        } else {
-            hasShownPopupForCurrentConnection = false
-            showConnectionPopup = false
+    LaunchedEffect(Unit) {
+        if (com.moondrop.controller.MainActivity.hasSplashShown) {
+            bluetoothManager.requestBluetoothPermission()
         }
     }
+
+    // In-app connection popup is completely disabled as per user request
 
     val savedPreGain = remember { bluetoothManager.getSavedPreGain() }
     val savedGains = remember { bluetoothManager.getSavedBandGains() }
@@ -227,8 +224,14 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 )
                 else -> defaultBands
             }
-            eqBands.clear()
-            eqBands.addAll(presetBands)
+            if (eqBands.size == presetBands.size) {
+                for (i in eqBands.indices) {
+                    eqBands[i] = eqBands[i].copy(gain = presetBands[i].gain)
+                }
+            } else {
+                eqBands.clear()
+                eqBands.addAll(presetBands)
+            }
         }
     }
 
@@ -985,6 +988,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                 splashVisible = false
                 delay(500)
                 isSplashScreenActive = false
+                com.moondrop.controller.MainActivity.hasSplashShown = true
                 // ALWAYS trigger permission check after splash finishes to check Bluetooth, Notification, and Overlay permissions
                 bluetoothManager.requestBluetoothPermission()
             }
@@ -1035,183 +1039,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
             }
         }
 
-        // Overlay: AirPods-style bottom slide-up pop-up upon connection
-        AnimatedVisibility(
-            visible = showConnectionPopup,
-            enter = slideInVertically(
-                initialOffsetY = { it },
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioLowBouncy,
-                    stiffness = Spring.StiffnessMediumLow
-                )
-            ) + fadeIn(),
-            exit = slideOutVertically(
-                targetOffsetY = { it },
-                animationSpec = tween(durationMillis = 300, easing = FastOutLinearInEasing)
-            ) + fadeOut(),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable { showConnectionPopup = false }
-            ) {
-                // Floating card wrapper
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .navigationBarsPadding() // Keep it above system navigation gesture bar/mBack
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 40.dp) // Suspend it above the bottom
-                ) {
-                    // 1. The Dialog Card Body
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(Color.Black, RoundedCornerShape(24.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
-                            .clickable(enabled = true, onClick = {}) // prevent click propagation
-                            .padding(top = 48.dp) // extra padding for overlapping badge
-                            .padding(bottom = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        // Drag handle
-                        Box(
-                            modifier = Modifier
-                                .padding(vertical = 12.dp)
-                                .width(36.dp)
-                                .height(4.dp)
-                                .background(Color.White.copy(alpha = 0.2f), CircleShape)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = "MOONDROP ULTRASONIC",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 16.sp,
-                            letterSpacing = 1.sp
-                        )
-                        Text(
-                            text = "已连接",
-                            color = Color.White.copy(alpha = 0.6f),
-                            fontSize = 12.sp
-                        )
-
-                        // Main Body: Left/Right earbud battery status
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.headphone_left),
-                                    contentDescription = "Left Earbud",
-                                    modifier = Modifier.height(100.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "L  $batteryLeft%",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Image(
-                                    painter = painterResource(id = R.drawable.headphone_right),
-                                    contentDescription = "Right Earbud",
-                                    modifier = Modifier.height(100.dp),
-                                    contentScale = ContentScale.Fit
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "R  $batteryRight%",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
-                            }
-                        }
-
-                        // Lower Part: Quick ANC toggle and dismiss button
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 40.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "NOISE CONTROL",
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 10.sp,
-                                letterSpacing = 1.sp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            val ancItems = listOf("通透", "降噪", "关闭")
-                            val currentAncIndex = when (activeAnc) {
-                                "Transparency" -> 0
-                                "ANC" -> 1
-                                else -> 2
-                            }
-
-                            MinimalSegmentedControl(
-                                items = ancItems,
-                                selectedIndex = currentAncIndex,
-                                onItemSelection = { index ->
-                                    val mode = when (index) {
-                                        0 -> "Transparency"
-                                        1 -> "ANC"
-                                        else -> "Normal"
-                                    }
-                                    bluetoothManager.setAncMode(mode)
-                                },
-                                isDark = true
-                            )
-
-                            Spacer(modifier = Modifier.height(28.dp))
-
-                            Button(
-                                onClick = { showConnectionPopup = false },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                                shape = RoundedCornerDefault,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(48.dp)
-                            ) {
-                                Text("DONE", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            }
-                        }
-                    }
-
-                    // 2. The Overlapping Logo Badge (half out of the top edge, top-left aligned, static, size 80.dp)
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_logo_transparent),
-                        contentDescription = "Moondrop Logo",
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .offset(x = 24.dp, y = (-40).dp)
-                            .size(80.dp)
-                    )
-                }
-            }
-        }
+        // In-app connection popup is completely removed as per user request
     }
 }
 
@@ -1321,6 +1149,17 @@ fun EQVisualizer(
     bands: List<BandConfig>,
     modifier: Modifier = Modifier
 ) {
+    val animatedGains = bands.mapIndexed { idx, band ->
+        animateFloatAsState(
+            targetValue = band.gain,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioNoBouncy,
+                stiffness = 300f
+            ),
+            label = "bandGain_$idx"
+        ).value
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1339,7 +1178,8 @@ fun EQVisualizer(
             // Map frequencies to X/Y coordinates
             val points = bands.mapIndexed { idx, band ->
                 val x = idx * (size.width / (bands.size - 1))
-                val y = size.height - ((band.gain + 12f) / 24f) * size.height
+                val animatedGain = animatedGains[idx]
+                val y = size.height - ((animatedGain + 12f) / 24f) * size.height
                 Offset(x, y)
             }
             
