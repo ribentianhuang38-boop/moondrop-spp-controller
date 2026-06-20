@@ -116,8 +116,9 @@ object GlobalPopupManager {
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .width(360.dp)
+                                .navigationBarsPadding()
                                 .padding(horizontal = 24.dp)
-                                .padding(bottom = 80.dp)
+                                .padding(bottom = 24.dp)
                         ) {
                             Box {
                                 Column(

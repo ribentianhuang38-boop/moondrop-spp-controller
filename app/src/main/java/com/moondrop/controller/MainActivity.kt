@@ -149,6 +149,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        isAppInForeground = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        isAppInForeground = false
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         volumeReceiver?.let {
@@ -159,5 +169,9 @@ class MainActivity : ComponentActivity() {
             }
         }
         volumeReceiver = null
+    }
+
+    companion object {
+        var isAppInForeground = false
     }
 }

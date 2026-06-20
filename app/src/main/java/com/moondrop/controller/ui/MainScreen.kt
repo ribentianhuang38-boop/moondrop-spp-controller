@@ -130,10 +130,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     LaunchedEffect(isConnected) {
         if (isConnected) {
             if (!hasShownPopupForCurrentConnection) {
-                // Only show in-app popup if overlay permission is not granted!
-                if (!android.provider.Settings.canDrawOverlays(context)) {
-                    showConnectionPopup = true
-                }
+                showConnectionPopup = true
                 hasShownPopupForCurrentConnection = true
             }
         } else {

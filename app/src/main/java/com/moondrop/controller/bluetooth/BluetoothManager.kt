@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import android.content.BroadcastReceiver
 import android.content.IntentFilter
@@ -131,12 +132,16 @@ class BluetoothManager(
         }
 
         scope.launch {
-            isConnected.collect { connected ->
+            combine(isConnected, currentAnc, currentBatteryLeft, currentBatteryRight) { connected, _, _, _ ->
+                connected
+            }.collect { connected ->
                 updateNotification()
                 if (connected) {
-                    // Show global connection popup overlay!
-                    scope.launch(Dispatchers.Main) {
-                        GlobalPopupManager.showPopup(context, this@BluetoothManager)
+                    // Show global connection popup overlay ONLY if the app is in the background!
+                    if (!com.moondrop.controller.MainActivity.isAppInForeground) {
+                        scope.launch(Dispatchers.Main) {
+                            GlobalPopupManager.showPopup(context, this@BluetoothManager)
+                        }
                     }
                 } else {
                     // Dismiss global popup overlay if disconnected
@@ -144,21 +149,6 @@ class BluetoothManager(
                         GlobalPopupManager.dismiss()
                     }
                 }
-            }
-        }
-        scope.launch {
-            currentAnc.collect {
-                updateNotification()
-            }
-        }
-        scope.launch {
-            currentBatteryLeft.collect {
-                updateNotification()
-            }
-        }
-        scope.launch {
-            currentBatteryRight.collect {
-                updateNotification()
             }
         }
     }
@@ -347,15 +337,6 @@ class BluetoothManager(
                         sendCustomEQ(preGainVal, bands)
                     } else {
                         selectEQPreset(savedPresetId)
-                    }
-                }
-                
-                // Launch ANC polling loop (every 2 seconds)
-                scope.launch {
-                    delay(2000)
-                    while (isConnected.value) {
-                        sendHex("ff040000001d1003")
-                        delay(2000)
                     }
                 }
                 
