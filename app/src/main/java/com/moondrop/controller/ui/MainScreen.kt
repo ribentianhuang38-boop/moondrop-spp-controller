@@ -98,16 +98,17 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     // Splash screen states
     var isSplashScreenActive by rememberSaveable { mutableStateOf(true) }
     var splashVisible by rememberSaveable { mutableStateOf(true) }
+    var splashTextVisible by remember { mutableStateOf(false) }
     
     val splashAlpha by animateFloatAsState(
         targetValue = if (splashVisible) 1f else 0f,
         animationSpec = tween(500, easing = FastOutSlowInEasing),
         label = "splashAlpha"
     )
-    val splashScale by animateFloatAsState(
-        targetValue = if (splashVisible) 1f else 0.85f,
-        animationSpec = tween(500, easing = FastOutSlowInEasing),
-        label = "splashScale"
+    val splashTextAlpha by animateFloatAsState(
+        targetValue = if (splashTextVisible) 1f else 0f,
+        animationSpec = tween(400, easing = FastOutSlowInEasing),
+        label = "splashTextAlpha"
     )
 
     val view = LocalView.current
@@ -129,7 +130,10 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     LaunchedEffect(isConnected) {
         if (isConnected) {
             if (!hasShownPopupForCurrentConnection) {
-                showConnectionPopup = true
+                // Only show in-app popup if overlay permission is not granted!
+                if (!android.provider.Settings.canDrawOverlays(context)) {
+                    showConnectionPopup = true
+                }
                 hasShownPopupForCurrentConnection = true
             }
         } else {
@@ -978,7 +982,9 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         // Overlay: Splash screen
         if (isSplashScreenActive) {
             LaunchedEffect(Unit) {
-                delay(800)
+                delay(150)
+                splashTextVisible = true
+                delay(650)
                 splashVisible = false
                 delay(500)
                 isSplashScreenActive = false
@@ -1005,22 +1011,29 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                         contentDescription = "Moondrop Logo",
                         modifier = Modifier.size(100.dp)
                     )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Text(
-                        text = "MOONDROP",
-                        letterSpacing = 4.sp,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "U L T R A S O N I C",
-                        letterSpacing = 2.sp,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = TextSecondary
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.graphicsLayer {
+                            alpha = splashTextAlpha
+                        }
+                    ) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = "MOONDROP",
+                            letterSpacing = 4.sp,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "U L T R A S O N I C",
+                            letterSpacing = 2.sp,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextSecondary
+                        )
+                    }
                 }
             }
         }

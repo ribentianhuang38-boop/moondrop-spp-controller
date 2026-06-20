@@ -186,6 +186,7 @@ class BluetoothManager(
         )
 
         val transparencyIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
+            setPackage(context.packageName)
             putExtra("mode", "Transparency")
         }
         val transparencyPending = PendingIntent.getBroadcast(
@@ -196,6 +197,7 @@ class BluetoothManager(
         )
 
         val ancIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
+            setPackage(context.packageName)
             putExtra("mode", "ANC")
         }
         val ancPending = PendingIntent.getBroadcast(
@@ -206,6 +208,7 @@ class BluetoothManager(
         )
 
         val normalIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
+            setPackage(context.packageName)
             putExtra("mode", "Normal")
         }
         val normalPending = PendingIntent.getBroadcast(

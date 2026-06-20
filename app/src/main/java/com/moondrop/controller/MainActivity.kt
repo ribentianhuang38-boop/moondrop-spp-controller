@@ -30,23 +30,8 @@ class MainActivity : ComponentActivity() {
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val bluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
-        } else {
-            listOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN)
-        }
-        val bluetoothGranted = bluetoothPermissions.all { 
-            permissions[it] == true || ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED 
-        }
-        if (bluetoothGranted) {
-            bluetoothManager.setBluetoothPermissionState(true)
-            initBluetooth()
-            // Cascade check for notification and overlay permissions
-            checkPermissions()
-        } else {
-            bluetoothManager.setBluetoothPermissionState(false)
-        }
+    ) { _ ->
+        checkAndRequestNextPermission()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,7 +74,7 @@ class MainActivity : ComponentActivity() {
         }
 
         bluetoothManager.onRequestPermission = {
-            checkPermissions()
+            checkAndRequestNextPermission()
         }
 
         // Check if Bluetooth permissions are already granted
@@ -109,7 +94,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkPermissions() {
+    private fun checkAndRequestNextPermission() {
         val bluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
         } else {
@@ -123,27 +108,39 @@ class MainActivity : ComponentActivity() {
         if (missingBluetooth.isNotEmpty()) {
             bluetoothManager.setBluetoothPermissionState(false)
             requestPermissionLauncher.launch(missingBluetooth.toTypedArray())
-        } else {
-            bluetoothManager.setBluetoothPermissionState(true)
-            initBluetooth()
-            // Optional: request notification permission on Android 13+ if not granted
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                    requestPermissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
-                }
+            return
+        }
+
+        bluetoothManager.setBluetoothPermissionState(true)
+        initBluetooth()
+
+        // 2. Check and request Notification permission on Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionLauncher.launch(arrayOf(Manifest.permission.POST_NOTIFICATIONS))
+                return
             }
-            // Request overlay permission (SYSTEM_ALERT_WINDOW) if missing
-            if (!android.provider.Settings.canDrawOverlays(this)) {
+        }
+
+        // 3. Check and request SYSTEM_ALERT_WINDOW (Overlay) permission
+        if (!android.provider.Settings.canDrawOverlays(this)) {
+            try {
                 val intent = android.content.Intent(
                     android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                     android.net.Uri.parse("package:$packageName")
                 )
+                startActivity(intent)
+            } catch (e: Exception) {
+                val intent = android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
                 startActivity(intent)
             }
         }
     }
 
     private fun initBluetooth() {
+        if (bluetoothManager.connectionState.value || bluetoothManager.reconnectingState.value) {
+            return
+        }
         val pairedDevices = bluetoothManager.getPairedDevices()
         val targetDevice = pairedDevices.firstOrNull { it.name?.contains("MOONDROP", ignoreCase = true) == true }
             ?: pairedDevices.firstOrNull()
