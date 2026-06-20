@@ -30,8 +30,15 @@ class MainActivity : ComponentActivity() {
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { permissions ->
-        val granted = permissions.entries.all { it.value }
-        if (granted) {
+        val bluetoothPermissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            listOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        } else {
+            listOf(Manifest.permission.BLUETOOTH, Manifest.permission.BLUETOOTH_ADMIN)
+        }
+        val bluetoothGranted = bluetoothPermissions.all { 
+            permissions[it] == true || ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED 
+        }
+        if (bluetoothGranted) {
             bluetoothManager.setBluetoothPermissionState(true)
             initBluetooth()
         } else {
@@ -101,11 +108,21 @@ class MainActivity : ComponentActivity() {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
         }
 
-        if (missing.isNotEmpty()) {
+        val missingBluetooth = permissions.filter {
+            it != Manifest.permission.POST_NOTIFICATIONS
+        }.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (missingBluetooth.isNotEmpty()) {
             bluetoothManager.setBluetoothPermissionState(false)
-            requestPermissionLauncher.launch(missing.toTypedArray())
         } else {
             bluetoothManager.setBluetoothPermissionState(true)
+        }
+
+        if (missing.isNotEmpty()) {
+            requestPermissionLauncher.launch(missing.toTypedArray())
+        } else {
             initBluetooth()
         }
     }

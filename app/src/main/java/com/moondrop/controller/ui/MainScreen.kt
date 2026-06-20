@@ -1194,12 +1194,12 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                             .align(Alignment.TopCenter)
                             .offset(y = (-32).dp)
                             .size(64.dp)
-                            .background(Color(0xFF111111), CircleShape)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                             .border(2.dp, BgWhite, CircleShape),
                         contentAlignment = Alignment.Center
                     ) {
                         Image(
-                            painter = painterResource(id = R.drawable.ic_logo),
+                            painter = painterResource(id = R.drawable.ic_logo_transparent),
                             contentDescription = "Moondrop Logo",
                             modifier = Modifier
                                 .size(36.dp)
