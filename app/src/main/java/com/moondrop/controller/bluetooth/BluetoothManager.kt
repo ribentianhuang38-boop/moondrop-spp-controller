@@ -1,5 +1,6 @@
 package com.moondrop.controller.bluetooth
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -9,6 +10,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
@@ -115,22 +117,6 @@ class BluetoothManager(
     private fun batteryRightFlow() = currentBatteryRight.asStateFlow()
 
     init {
-        // Register BroadcastReceiver for notification noise control buttons
-        val filter = IntentFilter("com.moondrop.controller.ACTION_SET_ANC")
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(ctx: Context?, intent: Intent?) {
-                intent?.let {
-                    val mode = it.getStringExtra("mode") ?: "Normal"
-                    setAncMode(mode)
-                }
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(receiver, filter)
-        }
-
         // Listen for OS-level Bluetooth connection broadcasts to trigger SPP socket instantly
         val aclFilter = IntentFilter().apply {
             addAction(BluetoothDevice.ACTION_ACL_CONNECTED)
@@ -147,6 +133,24 @@ class BluetoothManager(
                             if (deviceName?.contains("MOONDROP", ignoreCase = true) == true) {
                                 if (action == BluetoothDevice.ACTION_ACL_CONNECTED) {
                                     addLog("INFO", "System connected to $deviceName. Triggering SPP connection.")
+                                    
+                                    val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                        context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                                    } else {
+                                        true
+                                    }
+                                    if (hasPermission) {
+                                        val serviceIntent = Intent(context, BluetoothConnectionService::class.java)
+                                        try {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                context.startForegroundService(serviceIntent)
+                                            } else {
+                                                context.startService(serviceIntent)
+                                            }
+                                        } catch (e: Exception) {
+                                            addLog("ERROR", "Failed to start service: ${e.message}")
+                                        }
+                                    }
                                     connect(device)
                                 } else if (action == BluetoothDevice.ACTION_ACL_DISCONNECTED) {
                                     addLog("WARNING", "System disconnected from $deviceName.")
@@ -163,15 +167,6 @@ class BluetoothManager(
             }
         }
         context.registerReceiver(aclReceiver, aclFilter)
-
-        // Update notification when connection status, ANC, or battery changes
-        scope.launch {
-            combine(isConnected, currentAnc, currentBatteryLeft, currentBatteryRight) { _, _, _, _ ->
-                Unit
-            }.collect {
-                updateNotification()
-            }
-        }
 
         // Show global popup ONLY on connection transition (from disconnected to connected)
         scope.launch {
@@ -190,101 +185,6 @@ class BluetoothManager(
                 }
                 wasConnected = connected
             }
-        }
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val name = "Headset Status"
-            val descriptionText = "Displays connection status, battery, and ANC mode."
-            val importance = NotificationManager.IMPORTANCE_LOW
-            val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-                description = descriptionText
-            }
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun updateNotification() {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        
-        if (!isConnected.value) {
-            notificationManager.cancel(NOTIFICATION_ID)
-            return
-        }
-
-        createNotificationChannel()
-
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val transparencyIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
-            setPackage(context.packageName)
-            putExtra("mode", "Transparency")
-        }
-        val transparencyPending = PendingIntent.getBroadcast(
-            context,
-            1,
-            transparencyIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val ancIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
-            setPackage(context.packageName)
-            putExtra("mode", "ANC")
-        }
-        val ancPending = PendingIntent.getBroadcast(
-            context,
-            2,
-            ancIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val normalIntent = Intent("com.moondrop.controller.ACTION_SET_ANC").apply {
-            setPackage(context.packageName)
-            putExtra("mode", "Normal")
-        }
-        val normalPending = PendingIntent.getBroadcast(
-            context,
-            3,
-            normalIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val ancStr = when (currentAnc.value) {
-            "ANC" -> "降噪"
-            "Transparency" -> "通透"
-            "Normal" -> "普通"
-            else -> "普通"
-        }
-
-        val title = "${currentConnectedDevice.value?.name ?: "MOONDROP ULTRASONIC"} 已连接"
-        val content = "左耳: ${currentBatteryLeft.value}% | 右耳: ${currentBatteryRight.value}% | 模式: $ancStr"
-
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setContentIntent(pendingIntent)
-            .addAction(0, "通透", transparencyPending)
-            .addAction(0, "降噪", ancPending)
-            .addAction(0, "关闭", normalPending)
-            .build()
-
-        try {
-            notificationManager.notify(NOTIFICATION_ID, notification)
-        } catch (e: Exception) {
-            // Log warning if error occurs
         }
     }
 
@@ -339,6 +239,25 @@ class BluetoothManager(
         currentConnectedDevice.value = device
         isReconnecting.value = false
         addLog("INFO", "Connecting to ${device.name ?: "Device"} (${device.address})...")
+        
+        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+        if (hasPermission) {
+            val serviceIntent = Intent(context, BluetoothConnectionService::class.java)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+            } catch (e: Exception) {
+                addLog("ERROR", "Failed to start service on connect: ${e.message}")
+            }
+        }
+
         scope.launch {
             try {
                 disconnectInternal()
@@ -516,8 +435,10 @@ class BluetoothManager(
                     startReadLoop(device)
                     break
                 } catch (e: Exception) {
+                    val backoffDelay = (1500L * (1 shl (attempt - 1).coerceAtMost(4))).coerceAtMost(30000L)
+                    addLog("INFO", "Reconnect attempt $attempt failed. Retrying in ${backoffDelay / 1000.0}s...")
                     attempt++
-                    delay(1500)
+                    delay(backoffDelay)
                 }
             }
             if (!isConnected.value) {

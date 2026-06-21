@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import com.moondrop.controller.bluetooth.BluetoothConnectionService
 import com.moondrop.controller.bluetooth.BluetoothManager
 import com.moondrop.controller.ui.GlobalPopupManager
 import com.moondrop.controller.ui.MainScreen
@@ -89,6 +90,7 @@ class MainActivity : ComponentActivity() {
         }
         if (missingBluetooth.isEmpty()) {
             bluetoothManager.setBluetoothPermissionState(true)
+            startBluetoothService()
             initBluetooth()
         } else {
             bluetoothManager.setBluetoothPermissionState(false)
@@ -113,6 +115,7 @@ class MainActivity : ComponentActivity() {
         }
 
         bluetoothManager.setBluetoothPermissionState(true)
+        startBluetoothService()
         initBluetooth()
 
         // 2. Check and request Notification permission on Android 13+
@@ -147,6 +150,19 @@ class MainActivity : ComponentActivity() {
             ?: pairedDevices.firstOrNull()
         targetDevice?.let {
             bluetoothManager.connect(it)
+        }
+    }
+
+    private fun startBluetoothService() {
+        val serviceIntent = Intent(this, BluetoothConnectionService::class.java)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            Toast.makeText(this, "Failed to start background service: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
