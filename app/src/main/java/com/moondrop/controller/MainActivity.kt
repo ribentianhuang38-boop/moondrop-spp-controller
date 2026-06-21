@@ -29,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
     private lateinit var bluetoothManager: BluetoothManager
     private var volumeReceiver: BroadcastReceiver? = null
+    private var hasInitializedBluetooth = false
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -142,6 +143,9 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun initBluetooth() {
+        if (hasInitializedBluetooth) {
+            return
+        }
         if (bluetoothManager.connectionState.value || bluetoothManager.reconnectingState.value) {
             return
         }
@@ -149,6 +153,7 @@ class MainActivity : ComponentActivity() {
         val targetDevice = pairedDevices.firstOrNull { it.name?.contains("MOONDROP", ignoreCase = true) == true }
             ?: pairedDevices.firstOrNull()
         targetDevice?.let {
+            hasInitializedBluetooth = true
             bluetoothManager.connect(it)
         }
     }

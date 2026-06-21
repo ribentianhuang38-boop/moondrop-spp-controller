@@ -56,6 +56,10 @@ class BluetoothManager(
     private var inputStream: InputStream? = null
     private var outputStream: OutputStream? = null
     
+    private val connectLock = Any()
+    private var connectJob: kotlinx.coroutines.Job? = null
+    private var reconnectJob: kotlinx.coroutines.Job? = null
+    
     private val isConnected = MutableStateFlow(false)
     private val isReconnecting = MutableStateFlow(false)
     private val logs = MutableStateFlow<List<LogEntry>>(emptyList())
@@ -236,81 +240,86 @@ class BluetoothManager(
     }
 
     fun connect(device: BluetoothDevice) {
-        currentConnectedDevice.value = device
-        isReconnecting.value = false
-        addLog("INFO", "Connecting to ${device.name ?: "Device"} (${device.address})...")
-        
-        val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-        } else {
-            true
-        }
-        if (hasPermission) {
-            val serviceIntent = Intent(context, BluetoothConnectionService::class.java)
-            try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
-            } catch (e: Exception) {
-                addLog("ERROR", "Failed to start service on connect: ${e.message}")
+        synchronized(connectLock) {
+            connectJob?.cancel()
+            reconnectJob?.cancel()
+            
+            currentConnectedDevice.value = device
+            isReconnecting.value = false
+            addLog("INFO", "Connecting to ${device.name ?: "Device"} (${device.address})...")
+            
+            val hasPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
             }
-        }
-
-        scope.launch {
-            try {
-                disconnectInternal()
-                
-                socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
-                socket?.connect()
-                
-                inputStream = socket?.inputStream
-                outputStream = socket?.outputStream
-                isConnected.value = true
-                addLog("SUCCESS", "Connected to ${device.name ?: "Device"}!")
-                
-                scope.launch {
-                    delay(600)
-                    sendHex("ff040000001d1003") // Query ANC
-                    delay(250)
-                    sendHex("ff040000001d1e01") // Query Gain
-                    delay(250)
-                    sendHex("ff040000001d2a01") // Query LDAC
-                    delay(250)
-                    sendHex("ff040000001d2003") // Query LC3
-                    delay(250)
-                    
-                    val savedPresetId = prefs.getInt("selected_preset", 0)
-                    if (savedPresetId == 63) {
-                        val gains = getSavedBandGains()
-                        val preGainVal = getSavedPreGain()
-                        val bands = listOf(
-                            BandConfig(31, 1.0f, 13, gains.getOrElse(0) { 0.0f }),
-                            BandConfig(62, 1.0f, 13, gains.getOrElse(1) { 0.0f }),
-                            BandConfig(125, 1.0f, 13, gains.getOrElse(2) { 0.0f }),
-                            BandConfig(250, 1.0f, 13, gains.getOrElse(3) { 0.0f }),
-                            BandConfig(500, 1.0f, 13, gains.getOrElse(4) { 0.0f }),
-                            BandConfig(1000, 1.0f, 13, gains.getOrElse(5) { 0.0f }),
-                            BandConfig(2000, 1.0f, 13, gains.getOrElse(6) { 0.0f }),
-                            BandConfig(4000, 1.0f, 13, gains.getOrElse(7) { 0.0f }),
-                            BandConfig(8000, 1.0f, 13, gains.getOrElse(8) { 0.0f }),
-                            BandConfig(16000, 1.0f, 13, gains.getOrElse(9) { 0.0f })
-                        )
-                        sendCustomEQ(preGainVal, bands)
+            if (hasPermission) {
+                val serviceIntent = Intent(context, BluetoothConnectionService::class.java)
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(serviceIntent)
                     } else {
-                        selectEQPreset(savedPresetId)
+                        context.startService(serviceIntent)
                     }
+                } catch (e: Exception) {
+                    addLog("ERROR", "Failed to start service on connect: ${e.message}")
                 }
-                
-                startReadLoop(device)
-            } catch (e: IOException) {
-                addLog("ERROR", "Connection failed: ${e.message}")
-                isConnected.value = false
-                try { socket?.close() } catch (ex: Exception) {}
-                
-                if (autoReconnectEnabled.value) {
-                    triggerAutoReconnect(device)
+            }
+
+            connectJob = scope.launch {
+                try {
+                    disconnectInternal()
+                    
+                    socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                    socket?.connect()
+                    
+                    inputStream = socket?.inputStream
+                    outputStream = socket?.outputStream
+                    isConnected.value = true
+                    addLog("SUCCESS", "Connected to ${device.name ?: "Device"}!")
+                    
+                    scope.launch {
+                        delay(600)
+                        sendHex("ff040000001d1003") // Query ANC
+                        delay(250)
+                        sendHex("ff040000001d1e01") // Query Gain
+                        delay(250)
+                        sendHex("ff040000001d2a01") // Query LDAC
+                        delay(250)
+                        sendHex("ff040000001d2003") // Query LC3
+                        delay(250)
+                        
+                        val savedPresetId = prefs.getInt("selected_preset", 0)
+                        if (savedPresetId == 63) {
+                            val gains = getSavedBandGains()
+                            val preGainVal = getSavedPreGain()
+                            val bands = listOf(
+                                BandConfig(31, 1.0f, 13, gains.getOrElse(0) { 0.0f }),
+                                BandConfig(62, 1.0f, 13, gains.getOrElse(1) { 0.0f }),
+                                BandConfig(125, 1.0f, 13, gains.getOrElse(2) { 0.0f }),
+                                BandConfig(250, 1.0f, 13, gains.getOrElse(3) { 0.0f }),
+                                BandConfig(500, 1.0f, 13, gains.getOrElse(4) { 0.0f }),
+                                BandConfig(1000, 1.0f, 13, gains.getOrElse(5) { 0.0f }),
+                                BandConfig(2000, 1.0f, 13, gains.getOrElse(6) { 0.0f }),
+                                BandConfig(4000, 1.0f, 13, gains.getOrElse(7) { 0.0f }),
+                                BandConfig(8000, 1.0f, 13, gains.getOrElse(8) { 0.0f }),
+                                BandConfig(16000, 1.0f, 13, gains.getOrElse(9) { 0.0f })
+                            )
+                            sendCustomEQ(preGainVal, bands)
+                        } else {
+                            selectEQPreset(savedPresetId)
+                        }
+                    }
+                    
+                    startReadLoop(device)
+                } catch (e: IOException) {
+                    addLog("ERROR", "Connection failed: ${e.message}")
+                    isConnected.value = false
+                    try { socket?.close() } catch (ex: Exception) {}
+                    
+                    if (autoReconnectEnabled.value) {
+                        triggerAutoReconnect(device)
+                    }
                 }
             }
         }
@@ -410,40 +419,44 @@ class BluetoothManager(
     }
 
     private fun triggerAutoReconnect(device: BluetoothDevice) {
-        if (isReconnecting.value) return
-        
-        scope.launch {
-            isReconnecting.value = true
-            addLog("WARNING", "Connection lost! Waiting 1s for device to restart before auto-reconnect...")
-            delay(1000)
+        synchronized(connectLock) {
+            if (isReconnecting.value) return
             
-            var attempt = 1
-            val maxAttempts = 15
-            while (attempt <= maxAttempts && !isConnected.value && isReconnecting.value) {
-                addLog("INFO", "Auto-reconnect attempt ($attempt/$maxAttempts)...")
-                try {
-                    disconnectInternal()
-                    socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
-                    socket?.connect()
-                    
-                    inputStream = socket?.inputStream
-                    outputStream = socket?.outputStream
-                    isConnected.value = true
-                    isReconnecting.value = false
-                    addLog("SUCCESS", "Auto-reconnected successfully!")
-                    
-                    startReadLoop(device)
-                    break
-                } catch (e: Exception) {
-                    val backoffDelay = (1500L * (1 shl (attempt - 1).coerceAtMost(4))).coerceAtMost(30000L)
-                    addLog("INFO", "Reconnect attempt $attempt failed. Retrying in ${backoffDelay / 1000.0}s...")
-                    attempt++
-                    delay(backoffDelay)
+            reconnectJob?.cancel()
+            isReconnecting.value = true
+            
+            reconnectJob = scope.launch {
+                addLog("WARNING", "Connection lost! Waiting 1s for device to restart before auto-reconnect...")
+                delay(1000)
+                
+                var attempt = 1
+                val maxAttempts = 15
+                while (attempt <= maxAttempts && !isConnected.value && isReconnecting.value) {
+                    addLog("INFO", "Auto-reconnect attempt ($attempt/$maxAttempts)...")
+                    try {
+                        disconnectInternal()
+                        socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID)
+                        socket?.connect()
+                        
+                        inputStream = socket?.inputStream
+                        outputStream = socket?.outputStream
+                        isConnected.value = true
+                        isReconnecting.value = false
+                        addLog("SUCCESS", "Auto-reconnected successfully!")
+                        
+                        startReadLoop(device)
+                        break
+                    } catch (e: Exception) {
+                        val backoffDelay = (1500L * (1 shl (attempt - 1).coerceAtMost(4))).coerceAtMost(30000L)
+                        addLog("INFO", "Reconnect attempt $attempt failed. Retrying in ${backoffDelay / 1000.0}s...")
+                        attempt++
+                        delay(backoffDelay)
+                    }
                 }
-            }
-            if (!isConnected.value) {
-                isReconnecting.value = false
-                addLog("ERROR", "Auto-reconnect failed after $maxAttempts attempts.")
+                if (!isConnected.value) {
+                    isReconnecting.value = false
+                    addLog("ERROR", "Auto-reconnect failed after $maxAttempts attempts.")
+                }
             }
         }
     }
