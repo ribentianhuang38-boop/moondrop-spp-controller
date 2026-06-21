@@ -579,6 +579,7 @@ class BluetoothManager(
     }
 
     private fun addLog(direction: String, message: String) {
+        android.util.Log.d("MoondropBT", "[$direction] $message")
         val now = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.getDefault()).format(java.util.Date())
         val currentLogs = logs.value.toMutableList()
         currentLogs.add(LogEntry(now, direction, message))
