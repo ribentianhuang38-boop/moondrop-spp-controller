@@ -326,13 +326,17 @@ class BluetoothManager(
     }
 
     fun disconnect() {
-        currentConnectedDevice.value = null
-        isReconnecting.value = false
-        if (isConnected.value) {
-            addLog("WARNING", "Disconnected by user.")
+        synchronized(connectLock) {
+            connectJob?.cancel()
+            reconnectJob?.cancel()
+            currentConnectedDevice.value = null
+            isReconnecting.value = false
+            if (isConnected.value) {
+                addLog("WARNING", "Disconnected by user.")
+            }
+            isConnected.value = false
+            disconnectInternal()
         }
-        isConnected.value = false
-        disconnectInternal()
     }
 
     private fun disconnectInternal() {
