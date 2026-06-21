@@ -64,7 +64,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     val isReconnecting by bluetoothManager.reconnectingState.collectAsState()
     val autoReconnect by bluetoothManager.autoReconnect.collectAsState()
     val connectedDevice by bluetoothManager.deviceState.collectAsState()
-    val logs by bluetoothManager.logFlow.collectAsState()
+
     
     val activeAnc by bluetoothManager.ancMode.collectAsState()
     val activeGain by bluetoothManager.gainMode.collectAsState()
@@ -158,11 +158,11 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
     
     val listState = rememberLazyListState()
 
-    // Sync local eqBands when activePreset changes (Standard=6, Monitor=2, Dynamic=3, 89XX=4, 336XX=5)
+    // Sync local eqBands when activePreset changes (Standard=0, Monitor=1, Dynamic=2, 89XX=3, 336XX=4)
     LaunchedEffect(activePreset) {
         if (activePreset != 63) {
             val presetBands = when (activePreset) {
-                6 -> listOf( // 标准 (VDSF Target)
+                0 -> listOf( // 标准 (VDSF Target)
                     BandConfig(31, 1.0f, 13, 1.5f),
                     BandConfig(62, 1.0f, 13, 1.0f),
                     BandConfig(125, 1.0f, 13, 0.5f),
@@ -174,7 +174,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     BandConfig(8000, 1.0f, 13, 1.5f),
                     BandConfig(16000, 1.0f, 13, 0.5f)
                 )
-                2 -> listOf( // 监听 (Monitor Target - flat)
+                1 -> listOf( // 监听 (Monitor Target - flat)
                     BandConfig(31, 1.0f, 13, 0.0f),
                     BandConfig(62, 1.0f, 13, 0.0f),
                     BandConfig(125, 1.0f, 13, 0.0f),
@@ -186,7 +186,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     BandConfig(8000, 1.0f, 13, 0.0f),
                     BandConfig(16000, 1.0f, 13, 0.0f)
                 )
-                3 -> listOf( // 动感 (Dynamic Target - V-shaped)
+                2 -> listOf( // 动感 (Dynamic Target - V-shaped)
                     BandConfig(31, 1.0f, 13, 5.0f),
                     BandConfig(62, 1.0f, 13, 4.0f),
                     BandConfig(125, 1.0f, 13, 2.0f),
@@ -198,7 +198,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     BandConfig(8000, 1.0f, 13, 4.0f),
                     BandConfig(16000, 1.0f, 13, 2.0f)
                 )
-                4 -> listOf( // 89XX (Classic warm curve)
+                3 -> listOf( // 89XX (Classic warm curve)
                     BandConfig(31, 1.0f, 13, 2.0f),
                     BandConfig(62, 1.0f, 13, 1.5f),
                     BandConfig(125, 1.0f, 13, 1.0f),
@@ -210,7 +210,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                     BandConfig(8000, 1.0f, 13, 0.0f),
                     BandConfig(16000, 1.0f, 13, -1.0f)
                 )
-                5 -> listOf( // 336XX (High detail treble curve)
+                4 -> listOf( // 336XX (High detail treble curve)
                     BandConfig(31, 1.0f, 13, 0.0f),
                     BandConfig(62, 1.0f, 13, 0.0f),
                     BandConfig(125, 1.0f, 13, -1.0f),
@@ -235,11 +235,7 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
         }
     }
 
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
-            listState.animateScrollToItem(logs.size - 1)
-        }
-    }
+
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -508,22 +504,22 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                             // 3x2 Grid matching the Bluetrum preset index
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    PresetButton(name = "标准 (VDSF)", isSelected = activePreset == 6, modifier = Modifier.weight(1f)) {
-                                        bluetoothManager.selectEQPreset(6)
+                                    PresetButton(name = "标准 (VDSF)", isSelected = activePreset == 0, modifier = Modifier.weight(1f)) {
+                                        bluetoothManager.selectEQPreset(0)
                                     }
-                                    PresetButton(name = "监听", isSelected = activePreset == 2, modifier = Modifier.weight(1f)) {
+                                    PresetButton(name = "监听", isSelected = activePreset == 1, modifier = Modifier.weight(1f)) {
+                                        bluetoothManager.selectEQPreset(1)
+                                    }
+                                    PresetButton(name = "动感", isSelected = activePreset == 2, modifier = Modifier.weight(1f)) {
                                         bluetoothManager.selectEQPreset(2)
-                                    }
-                                    PresetButton(name = "动感", isSelected = activePreset == 3, modifier = Modifier.weight(1f)) {
-                                        bluetoothManager.selectEQPreset(3)
                                     }
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    PresetButton(name = "89XX", isSelected = activePreset == 4, modifier = Modifier.weight(1f)) {
-                                        bluetoothManager.selectEQPreset(4)
+                                    PresetButton(name = "89XX", isSelected = activePreset == 3, modifier = Modifier.weight(1f)) {
+                                        bluetoothManager.selectEQPreset(3)
                                     }
-                                    PresetButton(name = "336XX", isSelected = activePreset == 5, modifier = Modifier.weight(1f)) {
-                                        bluetoothManager.selectEQPreset(5)
+                                    PresetButton(name = "336XX", isSelected = activePreset == 4, modifier = Modifier.weight(1f)) {
+                                        bluetoothManager.selectEQPreset(4)
                                     }
                                     PresetButton(name = "自定义", isSelected = activePreset == 63, modifier = Modifier.weight(1f)) {
                                         bluetoothManager.selectEQPreset(63)
@@ -794,53 +790,6 @@ fun MainScreen(bluetoothManager: BluetoothManager) {
                                             shape = RoundedCornerDefault
                                         ) {
                                             Text("SEND", fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                        }
-                                    }
-                                }
-
-                                // Logs
-                                Column {
-                                    Text("TRANSMISSION LOGS", fontWeight = FontWeight.Bold, color = TextSecondary, fontSize = 10.sp)
-                                    Spacer(modifier = Modifier.height(6.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(140.dp)
-                                            .border(1.dp, BorderLight, RoundedCornerDefault)
-                                            .background(Color(0xFFFAFAFA))
-                                            .padding(8.dp)
-                                    ) {
-                                        LazyColumn(
-                                            state = listState,
-                                            modifier = Modifier.fillMaxSize()
-                                        ) {
-                                            items(logs) { log ->
-                                                val logColor = when (log.direction) {
-                                                    "TX" -> TextPrimary
-                                                    "RX" -> Color(0xFF34C759)
-                                                    "ERROR" -> Color(0xFFFF3B30)
-                                                    else -> TextSecondary
-                                                }
-                                                
-                                                Row(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(vertical = 1.dp)
-                                                ) {
-                                                    Text(
-                                                        text = "[${log.time}] ",
-                                                        color = TextSecondary,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontSize = 10.sp
-                                                    )
-                                                    Text(
-                                                        text = "${log.direction}: ${log.message}",
-                                                        color = logColor,
-                                                        fontFamily = FontFamily.Monospace,
-                                                        fontSize = 10.sp
-                                                    )
-                                                }
-                                            }
                                         }
                                     }
                                 }

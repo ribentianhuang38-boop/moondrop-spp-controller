@@ -64,7 +64,7 @@ class BluetoothManager(
 
     private val currentAnc = MutableStateFlow("Normal")
     private val currentGain = MutableStateFlow("Medium")
-    private val selectedPreset = MutableStateFlow(prefs.getInt("selected_preset", 6))
+    private val selectedPreset = MutableStateFlow(prefs.getInt("selected_preset", 0))
     
     private val isLdacEnabled = MutableStateFlow(false)
     private val isLc3Enabled = MutableStateFlow(false)
@@ -357,8 +357,12 @@ class BluetoothManager(
                     delay(250)
                     sendHex("ff040000001d1e01") // Query Gain
                     delay(250)
+                    sendHex("ff040000001d2a01") // Query LDAC
+                    delay(250)
+                    sendHex("ff040000001d2003") // Query LC3
+                    delay(250)
                     
-                    val savedPresetId = prefs.getInt("selected_preset", 6)
+                    val savedPresetId = prefs.getInt("selected_preset", 0)
                     if (savedPresetId == 63) {
                         val gains = getSavedBandGains()
                         val preGainVal = getSavedPreGain()
@@ -596,9 +600,23 @@ class BluetoothManager(
                 val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
                 "Gain Set ACK: $status"
             }
+            "2b01" -> {
+                if (dataPart.isNotEmpty()) {
+                    val enabled = dataPart[0] == 1.toByte()
+                    isLdacEnabled.value = enabled
+                    "LDAC Status: ${if (enabled) "Enabled" else "Disabled"}"
+                } else "LDAC Status Response"
+            }
             "2b02" -> {
                 val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
                 "LDAC Activation ACK: $status"
+            }
+            "2103" -> {
+                if (dataPart.isNotEmpty()) {
+                    val enabled = dataPart[0] == 1.toByte()
+                    isLc3Enabled.value = enabled
+                    "LC3 Status: ${if (enabled) "Enabled" else "Disabled"}"
+                } else "LC3 Status Response"
             }
             "2104" -> {
                 val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
@@ -693,6 +711,11 @@ class BluetoothManager(
             isLdacEnabled.value = false
             addLog("INFO", "Deactivating LDAC...")
         } else {
+            if (isLc3Enabled.value) {
+                sendHex("ff040001001d200400") // LC3 OFF
+                isLc3Enabled.value = false
+                addLog("INFO", "Disabling LC3 first for mutual exclusion...")
+            }
             if (cleanMac.length == 12) {
                 sendHex("ff040006001d2a02$cleanMac")
                 isLdacEnabled.value = true
@@ -707,6 +730,11 @@ class BluetoothManager(
             isLc3Enabled.value = false
             addLog("INFO", "Disabling LC3 / LE Audio...")
         } else {
+            if (isLdacEnabled.value) {
+                sendHex("ff040001001d2a0200") // LDAC OFF
+                isLdacEnabled.value = false
+                addLog("INFO", "Disabling LDAC first for mutual exclusion...")
+            }
             sendHex("ff040001001d200401") // LC3 ON
             isLc3Enabled.value = true
             addLog("INFO", "Enabling LC3 / LE Audio...")
