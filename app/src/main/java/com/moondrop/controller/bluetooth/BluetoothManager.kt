@@ -284,9 +284,9 @@ class BluetoothManager(
                         delay(250)
                         sendHex("ff040000001d1e01") // Query Gain
                         delay(250)
-                        sendHex("ff040000001d2a01") // Query LDAC
+                        sendHex("ff040000001d2002") // Query LDAC status
                         delay(250)
-                        sendHex("ff040000001d2003") // Query LC3
+                        sendHex("ff040000001d2001") // Query LC3 status
                         delay(250)
                         
                         val savedPresetId = prefs.getInt("selected_preset", 0)
@@ -538,7 +538,7 @@ class BluetoothManager(
                 val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
                 "Gain Set ACK: $status"
             }
-            "2b01" -> {
+            "2102" -> {
                 if (dataPart.isNotEmpty()) {
                     val enabled = dataPart[0] == 1.toByte()
                     isLdacEnabled.value = enabled
@@ -549,7 +549,7 @@ class BluetoothManager(
                 val status = if (byteArrayToHexString(dataPart) == "00") "Success" else "Failed (${byteArrayToHexString(dataPart)})"
                 "LDAC Activation ACK: $status"
             }
-            "2103" -> {
+            "2101" -> {
                 if (dataPart.isNotEmpty()) {
                     val enabled = dataPart[0] == 1.toByte()
                     isLc3Enabled.value = enabled
